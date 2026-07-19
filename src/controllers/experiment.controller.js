@@ -16,7 +16,9 @@ const getExperiments = async (req, res, next) => {
 
     const [experiments, total] = await Promise.all([
       Experiment.find(filter)
-        .select("-steps.hints -steps.misconceptionRisks")
+        // Exclude fields that would reveal the equipment/chemical selection answers or step
+        // hints up front — those are only surfaced through the selection/hint endpoints.
+        .select("-steps.hints -steps.misconceptionRisks -requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction")
         .sort({ subject: 1, difficulty: 1 })
         .skip(skip)
         .limit(parseInt(limit))
@@ -35,9 +37,13 @@ const getExperiments = async (req, res, next) => {
 };
 
 // GET /api/experiments/:id
+// Excludes requiredEquipment/requiredChemicals/reactionId and steps[].requiredChemicalsForStep/
+// expectedAction — those are the "answers" the equipment/chemical-selection and mix-grading
+// endpoints evaluate against, and must never be visible to the client ahead of submission.
 const getExperimentById = async (req, res, next) => {
   try {
     const experiment = await Experiment.findById(req.params.id)
+      .select("-requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction")
       .populate("relatedConcepts", "name description simpleExplanation visualizationAvailable")
       .lean();
 

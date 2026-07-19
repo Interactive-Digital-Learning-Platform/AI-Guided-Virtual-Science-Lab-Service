@@ -4,6 +4,7 @@ const Experiment = require("../models/Experiment");
 const User = require("../models/User");
 const { analyzeSession } = require("../services/aiService");
 const { generateFeedback } = require("../services/feedbackService");
+const { generateSelectionHint } = require("../services/labHintService");
 
 // POST /api/sessions/start
 const startSession = async (req, res, next) => {
@@ -39,15 +40,175 @@ const startSession = async (req, res, next) => {
   }
 };
 
+// POST /api/sessions/:id/equipment-selection
+// Body: { selectedEquipment: [String] }
+const submitEquipmentSelection = async (req, res, next) => {
+  try {
+    const { selectedEquipment } = req.body;
+    if (!Array.isArray(selectedEquipment)) {
+      return res.status(400).json({ success: false, message: "selectedEquipment array is required." });
+    }
+
+    const session = await Session.findById(req.params.id).populate("experimentId");
+    if (!session) return res.status(404).json({ success: false, message: "Session not found." });
+    if (session.phase !== "equipment_selection") {
+      return res.status(400).json({ success: false, message: "This session is not in the equipment selection phase." });
+    }
+
+    const experiment = session.experimentId;
+    const required = experiment.requiredEquipment || [];
+    const optional = experiment.optionalEquipment || [];
+
+    const correct = selectedEquipment.filter((e) => required.includes(e));
+    const missing = required.filter((e) => !selectedEquipment.includes(e));
+    const unnecessary = selectedEquipment.filter((e) => !required.includes(e) && !optional.includes(e));
+
+    session.equipmentSelection.selected = selectedEquipment;
+    session.equipmentSelection.correct = correct;
+    session.equipmentSelection.missing = missing;
+    session.equipmentSelection.unnecessary = unnecessary;
+    session.equipmentSelection.attempts += 1;
+
+    const isComplete = missing.length === 0 && unnecessary.length === 0;
+    if (isComplete) {
+      session.phase = "chemical_selection";
+      await session.save();
+      return res.status(200).json({
+        success: true,
+        data: { complete: true, correct, unnecessaryCount: 0, missingCount: 0, nextPhase: session.phase },
+      });
+    }
+
+    await session.save();
+
+    const relatedConcepts = await require("../models/Concept")
+      .find({ _id: { $in: experiment.relatedConcepts } })
+      .select("name")
+      .lean();
+
+    const hint = await generateSelectionHint({
+      phase: "equipment",
+      experimentTitle: experiment.title,
+      relatedConcepts: relatedConcepts.map((c) => c.name),
+      missingCount: missing.length,
+      unnecessaryCount: unnecessary.length,
+      attempts: session.equipmentSelection.attempts,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        complete: false,
+        correct,
+        unnecessaryItems: unnecessary, // safe to reveal — these are the student's own choices
+        missingCount: missing.length, // count only — names are withheld, per the guidance design
+        hint,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/sessions/:id/chemical-selection
+// Body: { selectedChemicalIds: [String] }
+const submitChemicalSelection = async (req, res, next) => {
+  try {
+    const { selectedChemicalIds } = req.body;
+    if (!Array.isArray(selectedChemicalIds)) {
+      return res.status(400).json({ success: false, message: "selectedChemicalIds array is required." });
+    }
+
+    const session = await Session.findById(req.params.id).populate("experimentId");
+    if (!session) return res.status(404).json({ success: false, message: "Session not found." });
+    if (session.phase !== "chemical_selection") {
+      return res.status(400).json({ success: false, message: "This session is not in the chemical selection phase." });
+    }
+
+    const experiment = session.experimentId;
+    const requiredIds = (experiment.requiredChemicals || []).map((r) => r.chemical.toString());
+
+    const correct = selectedChemicalIds.filter((id) => requiredIds.includes(id));
+    const missing = requiredIds.filter((id) => !selectedChemicalIds.includes(id));
+    const unnecessary = selectedChemicalIds.filter((id) => !requiredIds.includes(id));
+
+    session.chemicalSelection.selected = selectedChemicalIds;
+    session.chemicalSelection.correct = correct;
+    session.chemicalSelection.missing = missing;
+    session.chemicalSelection.unnecessary = unnecessary;
+    session.chemicalSelection.attempts += 1;
+
+    const isComplete = missing.length === 0 && unnecessary.length === 0;
+    if (isComplete) {
+      session.phase = "procedure";
+      await session.save();
+      return res.status(200).json({
+        success: true,
+        data: { complete: true, correct, unnecessaryCount: 0, missingCount: 0, nextPhase: session.phase },
+      });
+    }
+
+    await session.save();
+
+    const relatedConcepts = await require("../models/Concept")
+      .find({ _id: { $in: experiment.relatedConcepts } })
+      .select("name")
+      .lean();
+
+    const hint = await generateSelectionHint({
+      phase: "chemical",
+      experimentTitle: experiment.title,
+      relatedConcepts: relatedConcepts.map((c) => c.name),
+      missingCount: missing.length,
+      unnecessaryCount: unnecessary.length,
+      attempts: session.chemicalSelection.attempts,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        complete: false,
+        correct,
+        unnecessaryItems: unnecessary,
+        missingCount: missing.length,
+        hint,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // POST /api/sessions/:id/action
 const logAction = async (req, res, next) => {
   try {
-    const { stepId, actionType, actionDetail, expectedAction, timeTaken, hintLevel, conceptViolated } = req.body;
+    let { stepId, actionType, actionDetail, expectedAction, timeTaken, hintLevel, conceptViolated } = req.body;
+    const { equipmentType, chemicalIds, quantity, unit, conditions } = req.body;
 
-    const session = await Session.findById(req.params.id);
+    const session = await Session.findById(req.params.id).populate("experimentId");
     if (!session) return res.status(404).json({ success: false, message: "Session not found." });
     if (session.status !== "in_progress")
       return res.status(400).json({ success: false, message: "Session is not in progress." });
+
+    const experiment = session.experimentId;
+    const step = experiment.steps.find((s) => s.stepId === stepId);
+
+    // Mix steps tied to a curated reaction are graded server-side rather than trusting the
+    // client's self-reported actionType — the backend remains the source of truth on whether
+    // the student picked the right chemicals, per the architecture principle.
+    let reactionResult = null;
+    if (step?.actionType === "mix" && Array.isArray(chemicalIds) && chemicalIds.length >= 2) {
+      const { findReaction } = require("../services/reactionEngine");
+      reactionResult = await findReaction(chemicalIds, conditions || {});
+
+      if (step.requiredChemicalsForStep?.length > 0) {
+        const requiredSet = step.requiredChemicalsForStep.map((id) => id.toString()).sort();
+        const selectedSet = [...chemicalIds].sort();
+        const matches = requiredSet.length === selectedSet.length && requiredSet.every((id, i) => id === selectedSet[i]);
+        actionType = matches ? "correct" : "incorrect";
+        if (!matches) conceptViolated = conceptViolated || "CHEM_WRONG_REACTANTS";
+      }
+    }
 
     // Count attempts for this step in this session
     const stepAttempts = await Action.countDocuments({
@@ -59,7 +220,7 @@ const logAction = async (req, res, next) => {
     const action = await Action.create({
       sessionId: session._id,
       userId: req.user._id,
-      experimentId: session.experimentId,
+      experimentId: experiment._id,
       stepId,
       actionType,
       actionDetail: actionDetail || "",
@@ -68,6 +229,10 @@ const logAction = async (req, res, next) => {
       attemptNumber: stepAttempts + 1,
       hintLevel: hintLevel || null,
       conceptViolated: conceptViolated || null,
+      equipmentType: equipmentType || null,
+      chemicalIds: chemicalIds || [],
+      quantity: quantity ?? null,
+      unit: unit || null,
     });
 
     // Update session behavior features
@@ -93,10 +258,35 @@ const logAction = async (req, res, next) => {
     const stepErrors = await Action.countDocuments({ sessionId: session._id, stepId, actionType: "incorrect" });
     const suggestHint = stepErrors >= 2;
 
+    // Event-driven proactive intervention (spec's "AI Intervention Examples") — at most one
+    // per action, checked in priority order.
+    let intervention = null;
+    const { generateInterventionHint } = require("../services/labHintService");
+    if (step?.actionType === "mix" && reactionResult && !reactionResult.found && reactionResult.reason === "no_known_reaction") {
+      intervention = {
+        type: "unknown_combination",
+        hint: await generateInterventionHint({ triggerType: "unknown_combination", experimentTitle: experiment.title, context: { stepId } }),
+      };
+    } else if (step?.actionType === "heat" && experiment.reactionId) {
+      const Reaction = require("../models/Reaction");
+      const reaction = await Reaction.findById(experiment.reactionId).select("conditions.requiresHeat").lean();
+      if (reaction && !reaction.conditions.requiresHeat) {
+        intervention = {
+          type: "unnecessary_heat",
+          hint: await generateInterventionHint({ triggerType: "unnecessary_heat", experimentTitle: experiment.title, context: { stepId } }),
+        };
+      }
+    } else if (stepErrors >= 3) {
+      intervention = {
+        type: "repeated_mistake",
+        hint: await generateInterventionHint({ triggerType: "repeated_mistake", experimentTitle: experiment.title, context: { stepId, attempts: stepErrors } }),
+      };
+    }
+
     res.status(201).json({
       success: true,
       data: action,
-      meta: { suggestHint, stepErrors, currentStep: session.currentStep },
+      meta: { suggestHint, stepErrors, currentStep: session.currentStep, reactionResult, intervention },
     });
   } catch (error) {
     next(error);
@@ -160,11 +350,78 @@ const completeSession = async (req, res, next) => {
   }
 };
 
+// GET /api/sessions/:id/report
+// Assembles the full post-experiment laboratory report from Session + Action + Experiment data.
+const getSessionReport = async (req, res, next) => {
+  try {
+    const session = await Session.findById(req.params.id)
+      .populate("experimentId")
+      .populate("chemicalSelection.selected")
+      .lean();
+    if (!session) return res.status(404).json({ success: false, message: "Session not found." });
+    if (session.status !== "completed") {
+      return res.status(400).json({ success: false, message: "Report is available once the session is completed." });
+    }
+
+    const experiment = session.experimentId;
+    const actions = await Action.find({ sessionId: session._id })
+      .populate("chemicalIds", "name symbol")
+      .sort({ timestamp: 1 })
+      .lean();
+
+    const equipmentUsed = [...new Set(actions.map((a) => a.equipmentType).filter(Boolean))];
+    const chemicalsUsed = [
+      ...new Map(
+        actions.flatMap((a) => a.chemicalIds || []).map((c) => [c._id.toString(), { _id: c._id, name: c.name, symbol: c.symbol }])
+      ).values(),
+    ];
+
+    const proceduralErrors = actions.filter((a) => a.actionType === "incorrect" && (!a.conceptViolated || a.conceptViolated.startsWith("PROC")));
+    const conceptualErrors = session.aiFeedback.misconceptionsDetected || [];
+
+    res.status(200).json({
+      success: true,
+      data: {
+        experimentName: experiment.title,
+        subject: experiment.subject,
+        studentActions: actions.map((a) => ({
+          actionType: a.actionType,
+          stepId: a.stepId,
+          equipment: a.equipmentType,
+          chemicals: (a.chemicalIds || []).map((c) => c.name),
+          quantity: a.quantity,
+          unit: a.unit,
+          timestamp: a.timestamp,
+        })),
+        equipmentUsed,
+        chemicalsUsed,
+        procedureFollowed: experiment.steps.map((s) => ({ stepId: s.stepId, title: s.title, instruction: s.instruction })),
+        observations: experiment.expectedObservations || [],
+        errorsDetected: {
+          procedural: proceduralErrors.map((a) => ({ stepId: a.stepId, detail: a.actionDetail })),
+          conceptual: conceptualErrors,
+        },
+        aiFeedback: session.aiFeedback,
+        conceptsToImprove: session.aiFeedback.conceptsToImprove || [],
+        finalUnderstandingAssessment: session.aiFeedback.finalUnderstandingAssessment || null,
+        score: session.score,
+        totalTime: session.totalTime,
+        timestamp: session.updatedAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // GET /api/sessions/:id
 const getSession = async (req, res, next) => {
   try {
     const session = await Session.findById(req.params.id)
-      .populate("experimentId", "title subject steps")
+      // Pure-exclusion select (Mongo disallows mixing inclusion/exclusion outside sub-paths of
+      // the same field) — excludes the mix-step "answer" fields, same reasoning as
+      // getExperimentById. Everything else on Experiment is included, which is fine here.
+      .populate("experimentId", "-requiredEquipment -requiredChemicals -reactionId -steps.expectedAction -steps.requiredChemicalsForStep")
       .lean();
     if (!session) return res.status(404).json({ success: false, message: "Session not found." });
     res.status(200).json({ success: true, data: session });
@@ -238,4 +495,14 @@ const requestHint = async (req, res, next) => {
   }
 };
 
-module.exports = { startSession, logAction, completeSession, getSession, getUserSessions, requestHint };
+module.exports = {
+  startSession,
+  submitEquipmentSelection,
+  submitChemicalSelection,
+  logAction,
+  completeSession,
+  getSession,
+  getSessionReport,
+  getUserSessions,
+  requestHint,
+};

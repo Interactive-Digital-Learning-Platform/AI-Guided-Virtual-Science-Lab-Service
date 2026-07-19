@@ -41,6 +41,7 @@ const analyzeSession = async (session, actions) => {
   const incorrectActions = actions.filter((a) => a.actionType === "incorrect" && a.conceptViolated);
   const uniqueViolations = [...new Set(incorrectActions.map((a) => a.conceptViolated))];
 
+  const conceptsToImprove = new Set();
   for (const code of uniqueViolations) {
     const misconception = await Misconception.findOne({ code }).lean();
     if (misconception) {
@@ -51,6 +52,7 @@ const analyzeSession = async (session, actions) => {
         relatedStep: relatedAction?.stepId || null,
         correctionStrategy: misconception.correctionStrategy,
       });
+      (misconception.relatedConcepts || []).forEach((name) => conceptsToImprove.add(name));
     }
   }
 
@@ -85,8 +87,30 @@ const analyzeSession = async (session, actions) => {
     misconceptionsDetected,
     strengths,
     suggestions,
+    conceptsToImprove: [...conceptsToImprove],
+    finalUnderstandingAssessment: buildFinalUnderstandingAssessment(session.score, misconceptionsDetected),
     feedbackGeneratedAt: new Date(),
   };
+};
+
+/**
+ * A short qualitative assessment of the student's conceptual understanding — distinct from
+ * the numeric score, which only measures step correctness. Severity-weighted: a single
+ * high-severity misconception caps the assessment even with a high score.
+ */
+const buildFinalUnderstandingAssessment = (score, misconceptionsDetected) => {
+  const hasHighSeverityGap = misconceptionsDetected.some((m) => m.code && m.code.startsWith("PROC_") === false);
+
+  if (score >= 80 && misconceptionsDetected.length === 0) {
+    return "Advanced understanding — the student applied the underlying concepts correctly and consistently.";
+  }
+  if (score >= 60 && misconceptionsDetected.length <= 1) {
+    return "Developing understanding — the core concept was mostly grasped, with a specific gap worth revisiting.";
+  }
+  if (hasHighSeverityGap) {
+    return "Foundational understanding — one or more core concepts need to be revisited before attempting similar experiments.";
+  }
+  return "Foundational understanding — procedure was followed inconsistently; focus on reading each step carefully before acting.";
 };
 
 const buildFallbackSummary = (score, misconceptions, strengths) => {

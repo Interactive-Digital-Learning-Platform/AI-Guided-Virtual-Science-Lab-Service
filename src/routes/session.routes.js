@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const {
-  startSession, logAction, completeSession,
-  getSession, getUserSessions, requestHint,
+  startSession, submitEquipmentSelection, submitChemicalSelection,
+  logAction, completeSession,
+  getSession, getSessionReport, getUserSessions, requestHint,
 } = require("../controllers/session.controller");
 const { protect } = require("../middleware/auth");
 
@@ -11,6 +12,9 @@ router.use(protect);
 router.post("/start", startSession);
 router.get("/history", getUserSessions);
 router.get("/:id", getSession);
+router.get("/:id/report", getSessionReport);
+router.post("/:id/equipment-selection", submitEquipmentSelection);
+router.post("/:id/chemical-selection", submitChemicalSelection);
 router.post("/:id/action", logAction);
 router.post("/:id/complete", completeSession);
 router.post("/:id/hint", requestHint);

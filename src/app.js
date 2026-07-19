@@ -13,6 +13,8 @@ const experimentRoutes = require("./routes/experiment.routes");
 const sessionRoutes = require("./routes/session.routes");
 const feedbackRoutes = require("./routes/feedback.routes");
 const analyticsRoutes = require("./routes/analytics.routes");
+const chemicalRoutes = require("./routes/chemical.routes");
+const labRoutes = require("./routes/lab.routes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,7 +33,7 @@ app.use(
   cors({
     origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "bypass-tunnel-reminder"],
   })
 );
 
@@ -63,6 +65,8 @@ app.use("/api/experiments", experimentRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/chemicals", chemicalRoutes);
+app.use("/api/lab", labRoutes);
 
 // 404 handler
 app.use((req, res) => {

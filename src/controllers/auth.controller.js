@@ -16,12 +16,22 @@ const syncUser = async (req, res, next) => {
 
     let user = await User.findOne({ clerkId });
 
+    if (!user) {
+      // Fall back to matching by email so re-syncing under a new clerkId
+      // (e.g. Clerk account reset) re-links the existing record instead of
+      // colliding with the unique email index.
+      user = await User.findOne({ email: email.toLowerCase() });
+    }
+
     if (user) {
       // Update fields if changed
+      user.clerkId = clerkId;
       user.name = name;
       user.email = email;
       if (grade) user.grade = grade;
+      else if (!user.grade) user.grade = 8;
       if (school) user.school = school;
+      if (!["student", "teacher", "admin"].includes(user.role)) user.role = "student";
       await user.save();
     } else {
       // Create new user

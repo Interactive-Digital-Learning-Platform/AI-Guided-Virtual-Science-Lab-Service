@@ -18,6 +18,13 @@ const actionSchema = new mongoose.Schema(
     hintLevel: { type: Number, default: null }, // 1, 2, or 3 if hint requested
     conceptViolated: { type: String, default: null }, // misconception code if incorrect
     timestamp: { type: Date, default: Date.now },
+
+    // Structured event fields for the "Perform Experiment" phase (drag/pour/measure/mix/heat/observe).
+    // Optional — unused by the existing Physics/Biology step-grading flow.
+    equipmentType: { type: String, default: null }, // e.g. "beaker"
+    chemicalIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chemical" }],
+    quantity: { type: Number, default: null },
+    unit: { type: String, default: null },
   },
   { timestamps: false }
 );

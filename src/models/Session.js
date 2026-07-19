@@ -42,6 +42,8 @@ const sessionSchema = new mongoose.Schema(
       ],
       strengths: [{ type: String }],
       suggestions: [{ type: String }],
+      conceptsToImprove: [{ type: String }],
+      finalUnderstandingAssessment: { type: String, default: null },
       nextRecommendedExperiment: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Experiment",
@@ -51,6 +53,27 @@ const sessionSchema = new mongoose.Schema(
     },
 
     attemptNumber: { type: Number, default: 1 },
+
+    // Chemistry practical flow: equipment/chemical selection happen before `steps` begin.
+    phase: {
+      type: String,
+      enum: ["equipment_selection", "chemical_selection", "procedure", "completed"],
+      default: "equipment_selection",
+    },
+    equipmentSelection: {
+      selected: [{ type: String }],
+      correct: [{ type: String }],
+      missing: [{ type: String }],
+      unnecessary: [{ type: String }],
+      attempts: { type: Number, default: 0 },
+    },
+    chemicalSelection: {
+      selected: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chemical" }],
+      correct: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chemical" }],
+      missing: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chemical" }],
+      unnecessary: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chemical" }],
+      attempts: { type: Number, default: 0 },
+    },
   },
   { timestamps: true }
 );

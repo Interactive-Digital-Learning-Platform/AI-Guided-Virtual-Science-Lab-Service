@@ -7,9 +7,14 @@ const stepSchema = new mongoose.Schema({
   expectedAction: { type: String, required: true },
   actionType: {
     type: String,
-    enum: ["measure", "add", "observe", "record", "calculate", "setup", "mix", "heat", "filter"],
+    enum: ["measure", "add", "observe", "record", "calculate", "setup", "mix", "heat", "filter", "pour", "stir"],
     required: true,
   },
+  // For "mix" steps in Chemistry practicals tied to a curated reaction — lets the server
+  // authoritatively verify the student's chemical selection against reactionEngine.js
+  // instead of trusting the client's self-reported correctness (matches spec's
+  // "backend must remain the source of truth" principle).
+  requiredChemicalsForStep: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chemical" }],
   conceptTags: [{ type: mongoose.Schema.Types.ObjectId, ref: "Concept" }],
   misconceptionRisks: [{ type: String }], // misconception codes e.g. "PHY_001"
   timeLimit: { type: Number, default: 120 }, // seconds
@@ -40,6 +45,23 @@ const experimentSchema = new mongoose.Schema(
     totalAttempts: { type: Number, default: 0 },
     averageScore: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
+
+    // Pre-procedure selection phases (Chemistry practicals; optional for Physics/Biology).
+    // Evaluated before `steps` begin — see equipment/chemical selection endpoints.
+    requiredEquipment: [{ type: String }], // equipment type keys, e.g. "beaker", "ph_meter"
+    optionalEquipment: [{ type: String }], // valid but non-essential — not flagged as "unnecessary"
+    requiredChemicals: [
+      {
+        chemical: { type: mongoose.Schema.Types.ObjectId, ref: "Chemical", required: true },
+        quantity: { type: Number, default: null },
+        unit: { type: String, default: null },
+      },
+    ],
+    expectedObservations: [{ type: String }],
+    safetyInformation: [{ type: String }],
+    // For Chemistry practicals whose "Perform Experiment" phase resolves to a known reaction
+    // in the curated reaction database (see Reaction model / reactionEngine.js).
+    reactionId: { type: mongoose.Schema.Types.ObjectId, ref: "Reaction", default: null },
   },
   { timestamps: true }
 );
