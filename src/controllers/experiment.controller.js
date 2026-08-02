@@ -1,4 +1,6 @@
 const Experiment = require("../models/Experiment");
+const Chemical = require("../models/Chemical");
+const Reaction = require("../models/Reaction");
 
 // GET /api/experiments
 // Query params: subject, grade, difficulty, page, limit
@@ -82,4 +84,53 @@ const getExperimentsBySubject = async (req, res, next) => {
   }
 };
 
-module.exports = { getExperiments, getExperimentById, getExperimentsBySubject };
+// GET /api/experiments/:experimentId/compounds/:compoundId/build-template
+// Returns the blank-coefficient equation skeleton for the Compound Builder — reactant/product
+// formulas only, never the correct coefficients themselves (those are graded server-side by
+// POST /api/sessions/:id/compound-builds, same "backend stays source of truth" principle as
+// reactionEngine.js). coefficientOptions is a fixed 1-4 tray regardless of the compound, so its
+// size never hints at how many blanks need a repeated or higher value.
+const getCompoundBuildTemplate = async (req, res, next) => {
+  try {
+    const { experimentId, compoundId } = req.params;
+
+    const experiment = await Experiment.findById(experimentId).select("_id").lean();
+    if (!experiment) return res.status(404).json({ success: false, message: "Experiment not found." });
+
+    const compound = await Chemical.findById(compoundId).lean();
+    if (!compound) return res.status(404).json({ success: false, message: "Compound not found." });
+    if (!compound.isBuildableFromElements || !compound.buildReactionId) {
+      return res.status(400).json({ success: false, message: "This compound isn't buildable from elements." });
+    }
+
+    const reaction = await Reaction.findById(compound.buildReactionId)
+      .populate("reactants.chemical", "name symbol color")
+      .populate("products.chemical", "name symbol color")
+      .lean();
+    if (!reaction) return res.status(404).json({ success: false, message: "Build reaction not found." });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        compound: { _id: compound._id, name: compound.name, symbol: compound.symbol, formula: compound.formula, color: compound.color },
+        reactants: reaction.reactants.map((r) => ({
+          chemicalId: r.chemical._id,
+          name: r.chemical.name,
+          symbol: r.chemical.symbol,
+          color: r.chemical.color,
+        })),
+        products: reaction.products.map((p) => ({
+          chemicalId: p.chemical._id,
+          name: p.chemical.name,
+          symbol: p.chemical.symbol,
+          color: p.chemical.color,
+        })),
+        coefficientOptions: [1, 2, 3, 4],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getExperiments, getExperimentById, getExperimentsBySubject, getCompoundBuildTemplate };

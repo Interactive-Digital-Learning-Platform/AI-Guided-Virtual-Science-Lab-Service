@@ -2,9 +2,11 @@ const Session = require("../models/Session");
 const Action = require("../models/Action");
 const Experiment = require("../models/Experiment");
 const User = require("../models/User");
+const Chemical = require("../models/Chemical");
+const Reaction = require("../models/Reaction");
 const { analyzeSession } = require("../services/aiService");
 const { generateFeedback } = require("../services/feedbackService");
-const { generateSelectionHint } = require("../services/labHintService");
+const { generateSelectionHint, generateCompoundBuildHint, classifyCompoundBuildMistake } = require("../services/labHintService");
 
 // POST /api/sessions/start
 const startSession = async (req, res, next) => {
@@ -128,9 +130,27 @@ const submitChemicalSelection = async (req, res, next) => {
     const experiment = session.experimentId;
     const requiredIds = (experiment.requiredChemicals || []).map((r) => r.chemical.toString());
 
-    const correct = selectedChemicalIds.filter((id) => requiredIds.includes(id));
-    const missing = requiredIds.filter((id) => !selectedChemicalIds.includes(id));
-    const unnecessary = selectedChemicalIds.filter((id) => !requiredIds.includes(id));
+    // Compounds flagged isBuildableFromElements are satisfied by a completed build (see
+    // submitCompoundBuild below), not by tapping a select chip — split the required set so
+    // they're excluded from the ordinary "did you select the right chips" grading below.
+    const requiredChemicalDocs = requiredIds.length
+      ? await Chemical.find({ _id: { $in: requiredIds } }).select("isBuildableFromElements").lean()
+      : [];
+    const buildableRequiredIds = requiredChemicalDocs
+      .filter((c) => c.isBuildableFromElements)
+      .map((c) => c._id.toString());
+    const selectableRequiredIds = requiredIds.filter((id) => !buildableRequiredIds.includes(id));
+
+    const correct = selectedChemicalIds.filter((id) => selectableRequiredIds.includes(id));
+    const missing = selectableRequiredIds.filter((id) => !selectedChemicalIds.includes(id));
+    const unnecessary = selectedChemicalIds.filter(
+      (id) => !selectableRequiredIds.includes(id) && !buildableRequiredIds.includes(id)
+    );
+
+    const builtIds = (session.builtCompounds || [])
+      .filter((b) => b.completedAt)
+      .map((b) => b.chemical.toString());
+    const missingBuilds = buildableRequiredIds.filter((id) => !builtIds.includes(id));
 
     session.chemicalSelection.selected = selectedChemicalIds;
     session.chemicalSelection.correct = correct;
@@ -138,13 +158,13 @@ const submitChemicalSelection = async (req, res, next) => {
     session.chemicalSelection.unnecessary = unnecessary;
     session.chemicalSelection.attempts += 1;
 
-    const isComplete = missing.length === 0 && unnecessary.length === 0;
+    const isComplete = missing.length === 0 && unnecessary.length === 0 && missingBuilds.length === 0;
     if (isComplete) {
       session.phase = "procedure";
       await session.save();
       return res.status(200).json({
         success: true,
-        data: { complete: true, correct, unnecessaryCount: 0, missingCount: 0, nextPhase: session.phase },
+        data: { complete: true, correct, unnecessaryCount: 0, missingCount: 0, missingBuildsCount: 0, nextPhase: session.phase },
       });
     }
 
@@ -159,7 +179,7 @@ const submitChemicalSelection = async (req, res, next) => {
       phase: "chemical",
       experimentTitle: experiment.title,
       relatedConcepts: relatedConcepts.map((c) => c.name),
-      missingCount: missing.length,
+      missingCount: missing.length + missingBuilds.length,
       unnecessaryCount: unnecessary.length,
       attempts: session.chemicalSelection.attempts,
     });
@@ -171,8 +191,92 @@ const submitChemicalSelection = async (req, res, next) => {
         correct,
         unnecessaryItems: unnecessary,
         missingCount: missing.length,
+        // Count only — which compound(s) still need building is withheld, same "no names
+        // revealed" principle as missingCount above; the student discovers it by attempting
+        // builds via the Compound Builder.
+        missingBuildsCount: missingBuilds.length,
         hint,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/sessions/:id/compound-builds
+// Body: { compoundId, reactantCoefficients: [{ chemicalId, coefficient }], productCoefficient }
+// Grades a Compound Builder attempt against the compound's linked synthesis Reaction — the
+// backend remains the source of truth on whether the equation balances, same principle as
+// reactionEngine.js/logAction's server-side mix grading.
+const submitCompoundBuild = async (req, res, next) => {
+  try {
+    const { compoundId, reactantCoefficients, productCoefficient } = req.body;
+    if (!compoundId || !Array.isArray(reactantCoefficients) || typeof productCoefficient !== "number") {
+      return res
+        .status(400)
+        .json({ success: false, message: "compoundId, reactantCoefficients, and productCoefficient are required." });
+    }
+
+    const session = await Session.findById(req.params.id);
+    if (!session) return res.status(404).json({ success: false, message: "Session not found." });
+
+    const compound = await Chemical.findById(compoundId).lean();
+    if (!compound) return res.status(404).json({ success: false, message: "Compound not found." });
+    if (!compound.isBuildableFromElements || !compound.buildReactionId) {
+      return res.status(400).json({ success: false, message: "This compound isn't buildable from elements." });
+    }
+
+    const reaction = await Reaction.findById(compound.buildReactionId).lean();
+    if (!reaction) return res.status(404).json({ success: false, message: "Build reaction not found." });
+
+    let entry = session.builtCompounds.find((b) => b.chemical.toString() === compoundId);
+    if (!entry) {
+      session.builtCompounds.push({ chemical: compoundId, attempts: 0, completedAt: null });
+      entry = session.builtCompounds[session.builtCompounds.length - 1];
+    }
+    entry.attempts += 1;
+
+    const correctReactants = reaction.reactants
+      .map((r) => `${r.chemical.toString()}:${r.coefficient}`)
+      .sort();
+    const submittedReactants = reactantCoefficients
+      .map((r) => `${r.chemicalId}:${r.coefficient}`)
+      .sort();
+    const reactantsMatch =
+      correctReactants.length === submittedReactants.length &&
+      correctReactants.every((val, i) => val === submittedReactants[i]);
+
+    const productEntry = reaction.products.find((p) => p.chemical.toString() === compoundId);
+    const productMatches = !!productEntry && productCoefficient === productEntry.coefficient;
+
+    const isCorrect = reactantsMatch && productMatches;
+
+    if (isCorrect) {
+      entry.completedAt = new Date();
+      await session.save();
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          correct: true,
+          attempts: entry.attempts,
+          compound: { name: compound.name, symbol: compound.symbol },
+          balancedEquation: reaction.balancedEquation,
+          educationalInfo: reaction.educationalInfo,
+        },
+      });
+    }
+
+    const misconceptionCode = classifyCompoundBuildMistake({ reactantCoefficients, productCoefficient });
+    entry.lastMisconceptionCode = misconceptionCode;
+
+    await session.save();
+
+    const hint = await generateCompoundBuildHint({ compoundName: compound.name, attempts: entry.attempts, misconceptionCode });
+
+    res.status(200).json({
+      success: true,
+      data: { correct: false, attempts: entry.attempts, hint },
     });
   } catch (error) {
     next(error);
@@ -499,6 +603,7 @@ module.exports = {
   startSession,
   submitEquipmentSelection,
   submitChemicalSelection,
+  submitCompoundBuild,
   logAction,
   completeSession,
   getSession,

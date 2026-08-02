@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {
-  startSession, submitEquipmentSelection, submitChemicalSelection,
+  startSession, submitEquipmentSelection, submitChemicalSelection, submitCompoundBuild,
   logAction, completeSession,
   getSession, getSessionReport, getUserSessions, requestHint,
 } = require("../controllers/session.controller");
@@ -15,6 +15,7 @@ router.get("/:id", getSession);
 router.get("/:id/report", getSessionReport);
 router.post("/:id/equipment-selection", submitEquipmentSelection);
 router.post("/:id/chemical-selection", submitChemicalSelection);
+router.post("/:id/compound-builds", submitCompoundBuild);
 router.post("/:id/action", logAction);
 router.post("/:id/complete", completeSession);
 router.post("/:id/hint", requestHint);

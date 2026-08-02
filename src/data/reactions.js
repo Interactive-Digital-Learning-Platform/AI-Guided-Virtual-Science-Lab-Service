@@ -1,6 +1,83 @@
 // Curated starter set of O/L-level reactions. Reactants/products reference chemicals by
 // symbol (resolved to Chemical ObjectIds in seed.js) rather than a computational chemistry engine.
+//
+// The synthesis reactions below double as "build reactions" for the Compound Builder
+// (see Chemical.isBuildableFromElements) — seed.js links them to their product compound's
+// buildReactionId once both collections are inserted.
 const reactions = [
+  {
+    reactionId: "h2o-synthesis",
+    name: "Hydrogen + Oxygen",
+    reactants: [{ symbol: "H2", coefficient: 2 }, { symbol: "O2", coefficient: 1 }],
+    products: [{ symbol: "H2O", coefficient: 2 }],
+    balancedEquation: "2H2 + O2 → 2H2O",
+    reactionType: "synthesis",
+    conditions: { requiresHeat: false },
+    observableChanges: {
+      colorChange: { from: null, to: null },
+      gasProduced: false,
+      precipitateFormed: false,
+      heatProduced: true,
+      energyChange: "exothermic",
+    },
+    educationalInfo: {
+      bondType: "covalent",
+      explanation:
+        "Two hydrogen molecules combine with one oxygen molecule to form two molecules of water. Balancing this equation reflects the conservation of atoms — 4 hydrogen atoms and 2 oxygen atoms appear on both sides.",
+    },
+    safetyNotes: ["Hydrogen gas is highly flammable and explosive when mixed with air."],
+    difficulty: "easy",
+    grades: [9, 10, 11],
+  },
+  {
+    reactionId: "na-cl2-synthesis",
+    name: "Sodium + Chlorine",
+    reactants: [{ symbol: "Na", coefficient: 2 }, { symbol: "Cl2", coefficient: 1 }],
+    products: [{ symbol: "NaCl", coefficient: 2 }],
+    balancedEquation: "2Na + Cl2 → 2NaCl",
+    reactionType: "synthesis",
+    conditions: { requiresHeat: false },
+    observableChanges: {
+      colorChange: { from: "silver metal + pale green gas", to: "white solid" },
+      gasProduced: false,
+      precipitateFormed: false,
+      heatProduced: true,
+      energyChange: "exothermic",
+    },
+    educationalInfo: {
+      bondType: "ionic",
+      explanation:
+        "Sodium reacts vigorously with chlorine gas, each sodium atom losing one electron to a chlorine atom, forming an ionic lattice of sodium chloride (table salt).",
+    },
+    safetyNotes: ["Sodium reacts violently with moisture.", "Chlorine gas is toxic if inhaled."],
+    difficulty: "medium",
+    grades: [10, 11],
+  },
+  {
+    reactionId: "c-o2-synthesis",
+    name: "Carbon + Oxygen",
+    reactants: [{ symbol: "C", coefficient: 1 }, { symbol: "O2", coefficient: 1 }],
+    products: [{ symbol: "CO2", coefficient: 1 }],
+    balancedEquation: "C + O2 → CO2",
+    reactionType: "synthesis",
+    conditions: { requiresHeat: true, minTemperature: 300 },
+    observableChanges: {
+      colorChange: { from: null, to: null },
+      gasProduced: true,
+      gasName: "Carbon dioxide",
+      precipitateFormed: false,
+      heatProduced: true,
+      energyChange: "exothermic",
+    },
+    educationalInfo: {
+      bondType: "covalent",
+      explanation:
+        "Carbon burns in oxygen to form carbon dioxide — one atom of carbon combines with one molecule of oxygen. This is already balanced: one carbon and two oxygen atoms appear on each side.",
+    },
+    safetyNotes: ["Requires an ignition source — perform combustion steps under supervision."],
+    difficulty: "easy",
+    grades: [9, 10],
+  },
   {
     reactionId: "hcl-naoh-neutralization",
     name: "Hydrochloric Acid + Sodium Hydroxide",

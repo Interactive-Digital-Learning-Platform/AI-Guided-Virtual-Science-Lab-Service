@@ -112,4 +112,82 @@ const buildFallbackIntervention = (triggerType, context) => {
   }
 };
 
-module.exports = { generateSelectionHint, generateInterventionHint, hintLevelForAttempts };
+/**
+ * Heuristic classification of a wrong Compound Builder attempt, from the submitted coefficients
+ * alone — used both to tailor the hint below and to record a misconception code on the session
+ * (see submitCompoundBuild). Leaving every coefficient at 1 suggests the student never counted
+ * atoms at all (CHEM_BUILD_002); any other wrong, non-uniform guess suggests they tried to
+ * balance but misjudged the elements' valency/combining ratio (CHEM_BUILD_001).
+ */
+const classifyCompoundBuildMistake = ({ reactantCoefficients, productCoefficient }) => {
+  const allOnes = reactantCoefficients.every((r) => r.coefficient === 1) && productCoefficient === 1;
+  return allOnes ? "CHEM_BUILD_002" : "CHEM_BUILD_001";
+};
+
+/**
+ * Non-revealing, escalating hint for an incorrect Compound Builder equation-balancing attempt —
+ * mirrors generateSelectionHint's style (Gemini-backed with a rule-based fallback, 3 levels
+ * keyed off attempt count), tailored by the suspected misconception from classifyCompoundBuildMistake.
+ */
+const generateCompoundBuildHint = async ({ compoundName, attempts, misconceptionCode }) => {
+  const level = hintLevelForAttempts(attempts);
+  const client = getGenAI();
+
+  if (!client) return buildFallbackCompoundHint(compoundName, level, misconceptionCode);
+
+  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const focusHint =
+    misconceptionCode === "CHEM_BUILD_002"
+      ? "The student appears to have left every coefficient at 1 without counting atoms on each side."
+      : "The student appears to be guessing coefficients without considering the elements' valency or combining ratio.";
+
+  const prompt = `
+You are a science teacher guiding a student who is trying to balance the equation for forming ${compoundName}
+in a virtual Compound Builder activity.
+
+${focusHint}
+This is attempt ${attempts} at this equation (hint level ${level} of 3).
+
+Write ONE short guiding sentence (max 25 words) that helps them think about how to balance the equation,
+WITHOUT stating the correct coefficients or the balanced equation itself.
+- Level 1: prompt them to count atoms of each element on both sides
+- Level 2: point them toward checking valency/combining ratio for the elements involved
+- Level 3: suggest adjusting one coefficient at a time and recounting, without naming any value
+
+Do not use quotation marks in your answer.
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error("Gemini API error:", error.message);
+    return buildFallbackCompoundHint(compoundName, level, misconceptionCode);
+  }
+};
+
+const buildFallbackCompoundHint = (compoundName, level, misconceptionCode) => {
+  if (misconceptionCode === "CHEM_BUILD_002") {
+    const byLevel = {
+      1: `Count how many atoms of each element appear on each side of the equation for ${compoundName} — are they equal yet?`,
+      2: `Leaving every coefficient at 1 only works if the two sides already match — recount rather than assuming they do.`,
+      3: `Try adjusting one coefficient at a time and recount both sides after each change, rather than guessing the whole equation at once.`,
+    };
+    return byLevel[level] || byLevel[3];
+  }
+  const byLevel = {
+    1: `Look at the formula for ${compoundName} itself — how many of each atom does it contain? That tells you what the reactant side must add up to.`,
+    2: `Think about how many bonds each element typically forms — that combining ratio affects the coefficients you'll need.`,
+    3: `Try adjusting one coefficient at a time and recount both sides after each change, rather than guessing the whole equation at once.`,
+  };
+  return byLevel[level] || byLevel[3];
+};
+
+module.exports = {
+  generateSelectionHint,
+  generateInterventionHint,
+  generateCompoundBuildHint,
+  classifyCompoundBuildMistake,
+  hintLevelForAttempts,
+};

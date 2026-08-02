@@ -15,6 +15,14 @@ const chemicalSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // Distinguishes a raw element (buildable directly onto the bench, first-20-syllabus or not)
+    // from a compound (either handed to the student ready-made, or constructible via
+    // isBuildableFromElements — see reactionEngine.js / compound-builder endpoints).
+    chemicalType: { type: String, enum: ["element", "compound"], required: true, index: true },
+    // Compound-only: true iff `buildReactionId` points to a synthesis Reaction whose reactants
+    // are all elements within the O/L syllabus's first 20 (atomicNumber <= 20).
+    isBuildableFromElements: { type: Boolean, default: false },
+    buildReactionId: { type: mongoose.Schema.Types.ObjectId, ref: "Reaction", default: null },
     state: { type: String, enum: ["solid", "liquid", "gas", "aqueous"], required: true },
     color: { type: String, default: "#FFFFFF" }, // hex, used for bottle/liquid tint in UI
     concentration: { type: String, default: null }, // e.g. "1M", "dilute", "concentrated"

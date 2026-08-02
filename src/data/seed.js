@@ -75,6 +75,22 @@ const seed = async () => {
     const reactionMap = {};
     reactions.forEach((r) => { reactionMap[r.reactionId] = r._id; });
 
+    // Link buildable compounds (Chemical.isBuildableFromElements: true) to the synthesis
+    // reaction the Compound Builder validates attempts against — can't be known until reactions
+    // are inserted and have real ObjectIds, so this is a post-insert update pass.
+    const buildableCompoundReactions = {
+      H2O: "h2o-synthesis",
+      MgO: "mg-o2-combustion",
+      NaCl: "na-cl2-synthesis",
+      CO2: "c-o2-synthesis",
+    };
+    await Promise.all(
+      Object.entries(buildableCompoundReactions).map(([symbol, slug]) =>
+        Chemical.updateOne({ symbol }, { buildReactionId: reactionMap[slug] })
+      )
+    );
+    console.log(`✅ Linked ${Object.keys(buildableCompoundReactions).length} buildable compounds to their synthesis reactions`);
+
     // Attach concept IDs to the original generic (Physics/Biology + 2 shallow Chemistry) experiments
     const experimentConceptMap = {
       "Measuring Density": ["Density"],

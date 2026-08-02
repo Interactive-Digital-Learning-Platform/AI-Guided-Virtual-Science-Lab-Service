@@ -74,6 +74,19 @@ const sessionSchema = new mongoose.Schema(
       unnecessary: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chemical" }],
       attempts: { type: Number, default: 0 },
     },
+    // Tracks successful equation-balancing builds for required compounds flagged
+    // isBuildableFromElements — see compound-builds endpoint in session.controller.js.
+    builtCompounds: [
+      {
+        chemical: { type: mongoose.Schema.Types.ObjectId, ref: "Chemical" },
+        attempts: { type: Number, default: 0 },
+        completedAt: { type: Date, default: null },
+        // Misconception code guessed from the most recent wrong attempt's coefficient pattern
+        // (see submitCompoundBuild) — surfaced in the session report by aiService.js if the
+        // student struggled (2+ attempts) on this compound.
+        lastMisconceptionCode: { type: String, default: null },
+      },
+    ],
   },
   { timestamps: true }
 );

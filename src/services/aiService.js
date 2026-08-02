@@ -56,6 +56,25 @@ const analyzeSession = async (session, actions) => {
     }
   }
 
+  // ── Rule 4b: Struggled Compound Builder attempts → map to misconception KB ──
+  // Mirrors Rule 4, but keyed off session.builtCompounds.lastMisconceptionCode (set by
+  // submitCompoundBuild's classifyCompoundBuildMistake) instead of Action.conceptViolated,
+  // since compound-build attempts aren't recorded as Action documents.
+  const struggledBuilds = (session.builtCompounds || []).filter((b) => b.attempts >= 2 && b.lastMisconceptionCode);
+  const uniqueBuildViolations = [...new Set(struggledBuilds.map((b) => b.lastMisconceptionCode))];
+  for (const code of uniqueBuildViolations) {
+    const misconception = await Misconception.findOne({ code }).lean();
+    if (misconception) {
+      misconceptionsDetected.push({
+        code: misconception.code,
+        description: misconception.description,
+        relatedStep: null,
+        correctionStrategy: misconception.correctionStrategy,
+      });
+      (misconception.relatedConcepts || []).forEach((name) => conceptsToImprove.add(name));
+    }
+  }
+
   // ── Rule 5: Struggled steps → targeted suggestion ────────────────────────
   if (features.struggledSteps.length > 0) {
     suggestions.push(`You struggled with step(s) ${features.struggledSteps.join(", ")}. Try repeating those steps.`);
