@@ -9,6 +9,8 @@ const chemicalSchema = new mongoose.Schema(
     atomicMass: { type: Number, default: null },
     group: { type: Number, default: null },
     period: { type: Number, default: null },
+    electronConfiguration: { type: String, default: null }, // e.g. "2,8,1" — elements only, for the inspect panel
+    valency: { type: Number, default: null }, // combining power — elements only, for the inspect panel
     category: {
       type: String,
       enum: ["acid", "base", "salt", "metal", "non-metal", "metalloid", "indicator", "gas", "organic", "oxide"],
@@ -26,6 +28,9 @@ const chemicalSchema = new mongoose.Schema(
     state: { type: String, enum: ["solid", "liquid", "gas", "aqueous"], required: true },
     color: { type: String, default: "#FFFFFF" }, // hex, used for bottle/liquid tint in UI
     concentration: { type: String, default: null }, // e.g. "1M", "dilute", "concentrated"
+    // Curated only for liquid/aqueous chemicals where pH is meaningful — see phService.js, which
+    // falls back to a category-based estimate when this is unset. Null for solids/gases/elements.
+    phValue: { type: Number, default: null },
     safetyClassification: {
       type: String,
       enum: ["safe", "caution", "hazardous", "corrosive", "flammable", "toxic"],

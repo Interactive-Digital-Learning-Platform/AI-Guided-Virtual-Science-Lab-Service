@@ -65,4 +65,24 @@ const explainNoReaction = (chemicals) => {
   return "No known reaction between these substances in the curated dataset. They may be unreactive together, or this combination isn't part of the current set — ask the AI Tutor if you'd like to understand more.";
 };
 
-module.exports = { buildReactantKey, findReaction, explainNoReaction };
+/**
+ * Shapes a populated Reaction doc (reactants.chemical/products.chemical populated) into the
+ * client-facing ReactionResultType (found: true branch) — shared by every endpoint that reports
+ * a matched reaction (labRun.controller.js's continuous check, mixChemicals, and
+ * session.controller.js's live-bench mix-step grading).
+ */
+const serializeReactionMatch = (reaction) => ({
+  found: true,
+  reaction: {
+    id: reaction._id,
+    name: reaction.name,
+    balancedEquation: reaction.balancedEquation,
+    reactionType: reaction.reactionType,
+    products: reaction.products.map((p) => ({ chemical: p.chemical, coefficient: p.coefficient })),
+    observableChanges: reaction.observableChanges,
+    educationalInfo: reaction.educationalInfo,
+    safetyNotes: reaction.safetyNotes,
+  },
+});
+
+module.exports = { buildReactantKey, findReaction, explainNoReaction, serializeReactionMatch };

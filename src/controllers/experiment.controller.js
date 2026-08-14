@@ -19,7 +19,7 @@ const getExperiments = async (req, res, next) => {
     const [experiments, total] = await Promise.all([
       Experiment.find(filter)
         // Exclude fields that would reveal the equipment/chemical selection answers or step
-        // hints up front — those are only surfaced through the selection/hint endpoints.
+      
         .select("-steps.hints -steps.misconceptionRisks -requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction")
         .sort({ subject: 1, difficulty: 1 })
         .skip(skip)
@@ -39,9 +39,7 @@ const getExperiments = async (req, res, next) => {
 };
 
 // GET /api/experiments/:id
-// Excludes requiredEquipment/requiredChemicals/reactionId and steps[].requiredChemicalsForStep/
-// expectedAction — those are the "answers" the equipment/chemical-selection and mix-grading
-// endpoints evaluate against, and must never be visible to the client ahead of submission.
+
 const getExperimentById = async (req, res, next) => {
   try {
     const experiment = await Experiment.findById(req.params.id)
@@ -85,11 +83,7 @@ const getExperimentsBySubject = async (req, res, next) => {
 };
 
 // GET /api/experiments/:experimentId/compounds/:compoundId/build-template
-// Returns the blank-coefficient equation skeleton for the Compound Builder — reactant/product
-// formulas only, never the correct coefficients themselves (those are graded server-side by
-// POST /api/sessions/:id/compound-builds, same "backend stays source of truth" principle as
-// reactionEngine.js). coefficientOptions is a fixed 1-4 tray regardless of the compound, so its
-// size never hints at how many blanks need a repeated or higher value.
+
 const getCompoundBuildTemplate = async (req, res, next) => {
   try {
     const { experimentId, compoundId } = req.params;

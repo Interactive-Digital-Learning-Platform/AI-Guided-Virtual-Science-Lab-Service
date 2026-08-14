@@ -103,6 +103,8 @@ const buildFallbackIntervention = (triggerType, context) => {
       return "Safety check: before combining substances, consider whether you know their properties.";
     case "unnecessary_heat":
       return "Why do you think heating is required in this experiment? Consider the purpose before continuing.";
+    case "heating_empty_container":
+      return `Heating an empty ${context?.equipmentType || "container"} won't do much — did you mean to add something first?`;
     case "repeated_mistake":
       return `I noticed this step has been attempted ${context?.attempts || "several"} times. Let's review the concept behind this process.`;
     case "rushed_step":

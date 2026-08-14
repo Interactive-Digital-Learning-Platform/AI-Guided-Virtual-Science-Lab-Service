@@ -4,6 +4,7 @@ const Experiment = require("../models/Experiment");
 const User = require("../models/User");
 const Chemical = require("../models/Chemical");
 const Reaction = require("../models/Reaction");
+const LabRun = require("../models/LabRun");
 const { analyzeSession } = require("../services/aiService");
 const { generateFeedback } = require("../services/feedbackService");
 const { generateSelectionHint, generateCompoundBuildHint, classifyCompoundBuildMistake } = require("../services/labHintService");
@@ -287,7 +288,7 @@ const submitCompoundBuild = async (req, res, next) => {
 const logAction = async (req, res, next) => {
   try {
     let { stepId, actionType, actionDetail, expectedAction, timeTaken, hintLevel, conceptViolated } = req.body;
-    const { equipmentType, chemicalIds, quantity, unit, conditions } = req.body;
+    const { equipmentType, chemicalIds, quantity, unit } = req.body;
 
     const session = await Session.findById(req.params.id).populate("experimentId");
     if (!session) return res.status(404).json({ success: false, message: "Session not found." });
@@ -297,21 +298,33 @@ const logAction = async (req, res, next) => {
     const experiment = session.experimentId;
     const step = experiment.steps.find((s) => s.stepId === stepId);
 
-    // Mix steps tied to a curated reaction are graded server-side rather than trusting the
-    // client's self-reported actionType — the backend remains the source of truth on whether
-    // the student picked the right chemicals, per the architecture principle.
+    // Mix steps tied to a curated reaction are graded off what actually happened on the live
+    // bench (session.labRunId, see labRun.controller.js) rather than a client-submitted
+    // chemicalIds array — the backend remains the source of truth, and a step now completes the
+    // moment the required reaction actually fires on the bench, not on a separate "submit" tap.
     let reactionResult = null;
-    if (step?.actionType === "mix" && Array.isArray(chemicalIds) && chemicalIds.length >= 2) {
-      const { findReaction } = require("../services/reactionEngine");
-      reactionResult = await findReaction(chemicalIds, conditions || {});
+    if (step?.actionType === "mix" && step.requiredChemicalsForStep?.length > 0) {
+      const { buildReactantKey, serializeReactionMatch } = require("../services/reactionEngine");
+      const requiredKey = buildReactantKey(step.requiredChemicalsForStep.map((id) => id.toString()));
 
-      if (step.requiredChemicalsForStep?.length > 0) {
-        const requiredSet = step.requiredChemicalsForStep.map((id) => id.toString()).sort();
-        const selectedSet = [...chemicalIds].sort();
-        const matches = requiredSet.length === selectedSet.length && requiredSet.every((id, i) => id === selectedSet[i]);
-        actionType = matches ? "correct" : "incorrect";
-        if (!matches) conceptViolated = conceptViolated || "CHEM_WRONG_REACTANTS";
-      }
+      const labRun = session.labRunId ? await LabRun.findById(session.labRunId).lean() : null;
+      const matchedReaction = labRun?.reactionsTriggered?.length
+        ? await Reaction.findOne({ _id: { $in: labRun.reactionsTriggered }, reactantKey: requiredKey })
+            .populate("reactants.chemical")
+            .populate("products.chemical")
+        : null;
+
+      actionType = matchedReaction ? "correct" : "incorrect";
+      if (!matchedReaction) conceptViolated = conceptViolated || "CHEM_WRONG_REACTANTS";
+
+      reactionResult = matchedReaction
+        ? serializeReactionMatch(matchedReaction)
+        : {
+            found: false,
+            reason: "not_yet_triggered_on_bench",
+            explanation: "This combination hasn't happened on your bench yet — try it there first.",
+            hint: null,
+          };
     }
 
     // Count attempts for this step in this session

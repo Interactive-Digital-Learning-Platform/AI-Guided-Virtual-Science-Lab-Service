@@ -54,6 +54,10 @@ const sessionSchema = new mongoose.Schema(
 
     attemptNumber: { type: Number, default: 1 },
 
+    // Live drag-and-drop bench backing the "procedure" phase — see labRun.controller.js. Created
+    // lazily (scoped to this session) when the student first enters the workspace.
+    labRunId: { type: mongoose.Schema.Types.ObjectId, ref: "LabRun", default: null },
+
     // Chemistry practical flow: equipment/chemical selection happen before `steps` begin.
     phase: {
       type: String,
