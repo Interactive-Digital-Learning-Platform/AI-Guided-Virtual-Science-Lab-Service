@@ -186,10 +186,150 @@ const buildFallbackCompoundHint = (compoundName, level, misconceptionCode) => {
   return byLevel[level] || byLevel[3];
 };
 
+// Coarse, non-revealing category phrase for a step's actionType — used only by the rule-based
+// fallback below to keep hints loosely on-topic without ever naming actual equipment.
+const EQUIPMENT_CATEGORY_BY_ACTION_TYPE = {
+  measure: "measuring instruments",
+  record: "measuring instruments",
+  observe: "observation tools",
+  heat: "heating equipment",
+  mix: "the right container or mixing tool",
+  stir: "the right container or mixing tool",
+  pour: "the right container",
+  add: "the right container or a tool for adding small amounts",
+  filter: "filtration equipment",
+  setup: "the equipment set",
+  calculate: "the equipment set",
+};
+
+/**
+ * Step-level equipment hint for the Laboratory Workspace — surfaced automatically the moment the
+ * student attempts a step with the wrong (or no) equipment on the bench (see evaluateStepOnBench /
+ * logAction, session.controller.js), and also available on demand from the bulb (requestHint).
+ * Never reveals the equipment name, per generateSelectionHint's "no names" principle. Scoped to a
+ * single step's requiredEquipment (Experiment.steps[].requiredEquipment) and what's actually on the
+ * student's live bench right now — distinct from the pre-procedure equipment/chemical selection
+ * screens, which stay non-blocking.
+ */
+const generateEquipmentHint = async ({
+  experimentTitle,
+  stepTitle,
+  stepInstruction,
+  stepActionType,
+  requiredEquipment,
+  benchEquipmentTypes,
+  level,
+}) => {
+  const client = getGenAI();
+  const fallback = buildFallbackEquipmentHint({ level, stepActionType, requiredEquipment, benchEquipmentTypes });
+  if (!client) return fallback;
+
+  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const benchText = benchEquipmentTypes.length ? benchEquipmentTypes.join(", ") : "nothing yet";
+
+  const prompt = `
+You are a science teacher standing beside a student during a virtual "${experimentTitle}" practical.
+The student is on this step: "${stepTitle}" — ${stepInstruction}
+Equipment currently on their lab bench: ${benchText}.
+This is hint level ${level} of 3 for this step.
+
+Write ONE short in-character hint (max 25 words) that helps the student figure out what equipment
+this step needs, WITHOUT ever naming a specific piece of equipment.
+- Level 1 (conceptual): ask about the scientific property or purpose of this step — no mention of equipment or tools at all.
+- Level 2 (functional): describe the FUNCTION of the needed equipment (e.g. "an instrument that measures acidity") without naming it.
+- Level 3 (direct): point them toward checking a category in the equipment set (e.g. "measuring instruments") — still never say the equipment's actual name.
+
+Do not use quotation marks. Never mention any of: ${requiredEquipment.join(", ") || "no specific items"}.
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error("Gemini API error:", error.message);
+    return fallback;
+  }
+};
+
+const buildFallbackEquipmentHint = ({ level, stepActionType, requiredEquipment, benchEquipmentTypes }) => {
+  const stillMissing = requiredEquipment.filter((r) => !benchEquipmentTypes.includes(r));
+  if (stillMissing.length === 0) {
+    return "You've got the right equipment on your bench for this step — think about how to use it.";
+  }
+
+  const category = EQUIPMENT_CATEGORY_BY_ACTION_TYPE[stepActionType] || "the equipment set";
+  const byLevel = {
+    1: "What property of the solution are you trying to measure or change in this step?",
+    2: "Consider whether an observation tool or a measurement tool would be more useful here.",
+    3: `Take another look at ${category} in the equipment set — one of those is designed exactly for this step.`,
+  };
+  return byLevel[level] || byLevel[3];
+};
+
+/**
+ * Step-level chemical hint — sibling to generateEquipmentHint, same three-level non-revealing
+ * structure and same trigger points (automatic on a wrong attempt, or on demand from the bulb),
+ * but scoped to Experiment.steps[].requiredChemicalsForStep instead of requiredEquipment. Chemical
+ * names/formulas are withheld from the prompt itself (not just instructed against), since an LLM
+ * asked not to mention a name is far more reliable when it was never given that name to begin with.
+ */
+const generateChemicalHint = async ({
+  experimentTitle,
+  stepTitle,
+  stepInstruction,
+  stepActionType,
+  requiredChemicalCategories,
+  level,
+}) => {
+  const client = getGenAI();
+  const fallback = buildFallbackChemicalHint({ level, requiredChemicalCategories });
+  if (!client) return fallback;
+
+  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  const prompt = `
+You are a science teacher standing beside a student during a virtual "${experimentTitle}" practical.
+The student is on this step: "${stepTitle}" — ${stepInstruction}
+They have not yet added the right chemical(s) for this step. The general category involved: ${requiredChemicalCategories.join(", ") || "a specific substance"}.
+This is hint level ${level} of 3 for this step.
+
+Write ONE short in-character hint (max 25 words) that helps the student figure out which chemical(s)
+this step needs, WITHOUT ever naming the specific chemical, its formula, or its symbol.
+- Level 1 (conceptual): ask about the chemical property or role needed (e.g. acidic vs alkaline) — stay abstract.
+- Level 2 (functional): describe what the chemical should DO in this reaction/test, still no name or formula.
+- Level 3 (direct): point them toward checking their materials for a substance with that property — still never name it.
+
+Do not use quotation marks.
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error("Gemini API error:", error.message);
+    return fallback;
+  }
+};
+
+const buildFallbackChemicalHint = ({ level, requiredChemicalCategories }) => {
+  const byLevel = {
+    1: "What kind of solution does this step call for — think about the property being tested or produced.",
+    2: "Consider which of your materials would actually cause the change this step describes.",
+    3: `Check your materials for a substance that matches this step's purpose${
+      requiredChemicalCategories.length ? ` (${requiredChemicalCategories.join(", ")})` : ""
+    } — you've already got the right container.`,
+  };
+  return byLevel[level] || byLevel[3];
+};
+
 module.exports = {
   generateSelectionHint,
   generateInterventionHint,
   generateCompoundBuildHint,
+  generateEquipmentHint,
+  generateChemicalHint,
   classifyCompoundBuildMistake,
   hintLevelForAttempts,
 };

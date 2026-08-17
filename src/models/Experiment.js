@@ -10,11 +10,18 @@ const stepSchema = new mongoose.Schema({
     enum: ["measure", "add", "observe", "record", "calculate", "setup", "mix", "heat", "filter", "pour", "stir"],
     required: true,
   },
-  // For "mix" steps in Chemistry practicals tied to a curated reaction — lets the server
-  // authoritatively verify the student's chemical selection against reactionEngine.js
-  // instead of trusting the client's self-reported correctness (matches spec's
-  // "backend must remain the source of truth" principle).
+  // What this step actually requires to be marked correct — checked against the live bench
+  // (LabRun.equipment, see session.controller.js's evaluateStepOnBench) rather than trusted from
+  // the client, same "backend remains the source of truth" principle as the reaction engine.
+  // requiredChemicalsForStep was originally mix-step-only (graded via reactionEngine.js); it's now
+  // populated and validated for any step that genuinely involves a chemical. requiredEquipment is
+  // step-scoped and distinct from the experiment-level requiredEquipment above (that one gates the
+  // non-blocking pre-procedure equipment-selection screen; this one hard-validates a specific step
+  // once the student is inside the workspace). Both fields also feed the AI equipment/chemical hint
+  // system (labHintService.js) — never sent to the client directly (see the field-exclusion selects
+  // in experiment.controller.js / session.controller.js).
   requiredChemicalsForStep: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chemical" }],
+  requiredEquipment: [{ type: String }],
   conceptTags: [{ type: mongoose.Schema.Types.ObjectId, ref: "Concept" }],
   misconceptionRisks: [{ type: String }], // misconception codes e.g. "PHY_001"
   timeLimit: { type: Number, default: 120 }, // seconds
@@ -38,6 +45,9 @@ const experimentSchema = new mongoose.Schema(
     description: { type: String, required: true },
     objectives: [{ type: String }],
     materials: [{ type: String }],
+    lesson: { type: String, default: "" },
+    theory: { type: String, default: "" },
+    keyConcepts: [{ type: String }],
     steps: [stepSchema],
     relatedConcepts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Concept" }],
     commonMisconceptions: [{ type: String }], // misconception codes

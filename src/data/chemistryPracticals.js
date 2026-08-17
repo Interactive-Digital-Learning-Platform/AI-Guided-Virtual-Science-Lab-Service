@@ -17,6 +17,16 @@ const chemistryPracticals = [
       "Practice safe handling of corrosive chemicals",
     ],
     materials: ["Hydrochloric Acid", "Sodium Hydroxide", "Phenolphthalein Indicator"],
+    lesson: "Acids, Bases and Salts",
+    theory:
+      "An acid is a substance that releases hydrogen ions (H+) in aqueous solution, while a base releases hydroxide ions (OH-) or accepts H+ ions. When an acid and a base react, the H+ and OH- ions combine to form water, and the remaining ions form a salt — this is called neutralization: acid + base → salt + water. Because HCl is a strong acid and NaOH is a strong base, the reaction goes to completion and releases heat (it is exothermic). Phenolphthalein is colourless in acidic and neutral solution but turns pink in basic solution, which makes it useful for signalling when the base has just begun to be in excess.",
+    keyConcepts: [
+      "Acids and bases are defined by the ions they release in water (H+ and OH-)",
+      "Neutralization: acid + base → salt + water",
+      "Neutralization reactions are exothermic",
+      "Indicators change colour at specific pH ranges and can signal a reaction endpoint",
+      "The pH scale (0-14) measures how acidic or basic a solution is, with 7 being neutral",
+    ],
     requiredEquipment: ["beaker", "measuring_cylinder", "dropper", "ph_meter", "stirrer"],
     optionalEquipment: ["thermometer"],
     requiredChemicalSymbols: ["HCl", "NaOH", "Phph"],
@@ -41,6 +51,8 @@ const chemistryPracticals = [
         instruction: "Use the measuring cylinder to measure 10ml of hydrochloric acid.",
         expectedAction: "measure_hcl",
         actionType: "measure",
+        requiredEquipment: ["measuring_cylinder"],
+        requiredChemicalsForStepSymbols: ["HCl"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "Look at your equipment selection — which tool is designed for measuring liquid volume accurately?" },
@@ -54,6 +66,8 @@ const chemistryPracticals = [
         instruction: "Pour the measured hydrochloric acid into the beaker.",
         expectedAction: "pour_hcl_beaker",
         actionType: "pour",
+        requiredEquipment: ["beaker"],
+        requiredChemicalsForStepSymbols: ["HCl"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "Which piece of equipment will hold your reaction as it happens?" },
@@ -67,6 +81,8 @@ const chemistryPracticals = [
         instruction: "Add 2-3 drops of phenolphthalein indicator to the acid in the beaker.",
         expectedAction: "add_indicator",
         actionType: "add",
+        requiredEquipment: ["dropper"],
+        requiredChemicalsForStepSymbols: ["Phph"],
         misconceptionRisks: ["CHEM_002"],
         hints: [
           { level: 1, text: "How will you know when the reaction has reached its endpoint?" },
@@ -81,6 +97,7 @@ const chemistryPracticals = [
         expectedAction: "mix_hcl_naoh",
         actionType: "mix",
         requiredChemicalsForStepSymbols: ["HCl", "NaOH"],
+        requiredEquipment: ["stirrer"],
         misconceptionRisks: ["CHEM_001", "CHEM_004"],
         hints: [
           { level: 1, text: "What kind of substance would neutralize an acid?" },
@@ -94,6 +111,7 @@ const chemistryPracticals = [
         instruction: "Observe the color change and pH reading, and record your observations.",
         expectedAction: "observe_endpoint",
         actionType: "observe",
+        requiredEquipment: ["ph_meter"],
         misconceptionRisks: ["CHEM_003"],
         hints: [
           { level: 1, text: "What does the indicator's color tell you about the solution right now?" },
@@ -116,6 +134,16 @@ const chemistryPracticals = [
       "Understand the pH scale",
     ],
     materials: ["Hydrochloric Acid", "Sodium Hydroxide", "Water", "Universal Indicator Solution"],
+    lesson: "Acids, Bases and Salts",
+    theory:
+      "Every aqueous solution can be placed on the pH scale, which runs from 0 to 14. Solutions with a pH below 7 are acidic, a pH of exactly 7 is neutral, and a pH above 7 is basic (alkaline). Universal indicator is a mixture of several dyes that produces a different colour at each point on the pH scale — red/orange for strong acids, green for neutral, and blue/purple for strong bases — so it can be used to estimate pH by eye. A pH meter measures the hydrogen ion concentration electronically and gives a precise numerical reading, which is more accurate than comparing indicator colour alone.",
+    keyConcepts: [
+      "The pH scale runs from 0 (strongly acidic) to 14 (strongly basic), with 7 as neutral",
+      "Universal indicator shows a range of colours corresponding to pH value",
+      "A pH meter gives a precise numerical pH reading",
+      "Pure water is close to pH 7",
+      "Classifying a solution requires comparing both colour and numeric pH evidence",
+    ],
     requiredEquipment: ["test_tube", "dropper", "ph_meter"],
     optionalEquipment: ["beaker"],
     requiredChemicalSymbols: ["HCl", "NaOH", "H2O", "UI"],
@@ -136,6 +164,8 @@ const chemistryPracticals = [
         instruction: "Add a few drops of universal indicator to the hydrochloric acid sample and observe.",
         expectedAction: "test_acid",
         actionType: "add",
+        requiredEquipment: ["dropper", "test_tube"],
+        requiredChemicalsForStepSymbols: ["UI", "HCl"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "What tool lets you compare color against a pH scale?" },
@@ -149,6 +179,8 @@ const chemistryPracticals = [
         instruction: "Add a few drops of universal indicator to the sodium hydroxide sample and observe.",
         expectedAction: "test_base",
         actionType: "add",
+        requiredEquipment: ["dropper", "test_tube"],
+        requiredChemicalsForStepSymbols: ["UI", "NaOH"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "Repeat what you just did, but with a different sample — what result do you expect this time?" },
@@ -162,6 +194,8 @@ const chemistryPracticals = [
         instruction: "Add a few drops of universal indicator to the water sample as a neutral reference.",
         expectedAction: "test_neutral",
         actionType: "add",
+        requiredEquipment: ["dropper", "test_tube"],
+        requiredChemicalsForStepSymbols: ["UI", "H2O"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "What result would you expect for a substance that's neither acidic nor basic?" },
@@ -175,6 +209,7 @@ const chemistryPracticals = [
         instruction: "Use the pH meter to record an exact reading for each sample and classify it.",
         expectedAction: "record_ph_classification",
         actionType: "record",
+        requiredEquipment: ["ph_meter"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "How can you get a precise number rather than just a color estimate?" },
@@ -197,6 +232,16 @@ const chemistryPracticals = [
       "Relate an observed color change to the underlying reaction",
     ],
     materials: ["Zinc", "Copper(II) Sulfate"],
+    lesson: "Metals and the Reactivity Series",
+    theory:
+      "The reactivity series ranks metals by how readily they lose electrons to form positive ions. A more reactive metal can displace a less reactive metal from a solution of its salt, because the more reactive metal loses electrons more easily and reduces the less reactive metal's ions back to solid metal. Zinc is more reactive than copper, so when zinc is added to copper(II) sulfate solution, zinc atoms give up electrons to become Zn2+ ions (entering the solution), while Cu2+ ions gain those electrons and are deposited as solid copper: Zn(s) + CuSO4(aq) → ZnSO4(aq) + Cu(s). This is a redox reaction — zinc is oxidised and copper is reduced.",
+    keyConcepts: [
+      "The reactivity series ranks metals by how easily they lose electrons",
+      "A more reactive metal displaces a less reactive metal from its salt solution",
+      "Displacement reactions are redox reactions (oxidation and reduction occurring together)",
+      "Colour change of the solution signals loss of the metal ion originally dissolved in it",
+      "Zn(s) + CuSO4(aq) → ZnSO4(aq) + Cu(s)",
+    ],
     requiredEquipment: ["test_tube", "beaker", "balance"],
     optionalEquipment: ["stirrer"],
     requiredChemicalSymbols: ["Zn", "CuSO4"],
@@ -217,6 +262,8 @@ const chemistryPracticals = [
         instruction: "Use the balance to measure a small sample of zinc.",
         expectedAction: "measure_zinc",
         actionType: "measure",
+        requiredEquipment: ["balance"],
+        requiredChemicalsForStepSymbols: ["Zn"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "Which piece of equipment measures mass rather than volume?" },
@@ -230,6 +277,8 @@ const chemistryPracticals = [
         instruction: "Pour copper sulfate solution into the test tube.",
         expectedAction: "pour_cuso4",
         actionType: "pour",
+        requiredEquipment: ["test_tube"],
+        requiredChemicalsForStepSymbols: ["CuSO4"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "Which container will hold the solution the zinc reacts with?" },
@@ -244,6 +293,7 @@ const chemistryPracticals = [
         expectedAction: "mix_zn_cuso4",
         actionType: "mix",
         requiredChemicalsForStepSymbols: ["Zn", "CuSO4"],
+        requiredEquipment: ["test_tube"],
         misconceptionRisks: ["CHEM_005"],
         hints: [
           { level: 1, text: "Think about the reactivity series — is the metal you're adding more or less reactive than copper?" },
@@ -257,6 +307,7 @@ const chemistryPracticals = [
         instruction: "Observe the color change in the solution and the deposit forming on the metal.",
         expectedAction: "observe_displacement",
         actionType: "observe",
+        requiredEquipment: ["test_tube"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "What's happening to the blue color of the solution over time?" },
@@ -279,6 +330,16 @@ const chemistryPracticals = [
       "Understand gas tests as a method of chemical identification",
     ],
     materials: ["Hydrochloric Acid", "Calcium Carbonate", "Limewater"],
+    lesson: "Chemical Changes and Tests for Gases",
+    theory:
+      "Carbonates react with dilute acids to produce a salt, water, and carbon dioxide gas: calcium carbonate + hydrochloric acid → calcium chloride + water + carbon dioxide, i.e. CaCO3(s) + 2HCl(aq) → CaCl2(aq) + H2O(l) + CO2(g). The bubbling observed is the carbon dioxide gas escaping the solution. Because many gases are colourless, chemists confirm a gas's identity using a specific chemical test rather than sight alone. The standard test for carbon dioxide is to pass the gas through limewater (a dilute solution of calcium hydroxide); CO2 reacts with the dissolved calcium hydroxide to form insoluble calcium carbonate, which makes the limewater turn milky/cloudy.",
+    keyConcepts: [
+      "Carbonate + acid → salt + water + carbon dioxide",
+      "CaCO3(s) + 2HCl(aq) → CaCl2(aq) + H2O(l) + CO2(g)",
+      "Gas identity is confirmed with a specific chemical test, not appearance alone",
+      "The limewater test: CO2 turns limewater milky/cloudy",
+      "Limewater turning cloudy is caused by insoluble calcium carbonate forming in the solution",
+    ],
     requiredEquipment: ["test_tube", "beaker", "dropper"],
     optionalEquipment: [],
     requiredChemicalSymbols: ["HCl", "CaCO3", "Ca(OH)2"],
@@ -298,6 +359,8 @@ const chemistryPracticals = [
         instruction: "Place a small amount of calcium carbonate into the test tube.",
         expectedAction: "add_caco3",
         actionType: "add",
+        requiredEquipment: ["test_tube"],
+        requiredChemicalsForStepSymbols: ["CaCO3"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "Which of your selected chemicals is a solid you'll react with an acid?" },
@@ -312,6 +375,7 @@ const chemistryPracticals = [
         expectedAction: "mix_hcl_caco3",
         actionType: "mix",
         requiredChemicalsForStepSymbols: ["HCl", "CaCO3"],
+        requiredEquipment: ["test_tube", "dropper"],
         misconceptionRisks: ["CHEM_004"],
         hints: [
           { level: 1, text: "Acids react with certain classes of solid — what class does your solid belong to?" },
@@ -325,6 +389,8 @@ const chemistryPracticals = [
         instruction: "Direct the gas produced through limewater and observe any change.",
         expectedAction: "test_gas_limewater",
         actionType: "observe",
+        requiredEquipment: ["beaker"],
+        requiredChemicalsForStepSymbols: ["Ca(OH)2"],
         misconceptionRisks: [],
         hints: [
           { level: 1, text: "What change would confirm the identity of the gas you've produced?" },

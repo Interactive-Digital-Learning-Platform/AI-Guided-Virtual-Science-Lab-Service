@@ -3,13 +3,14 @@ const router = express.Router();
 const {
   startSession, submitEquipmentSelection, submitChemicalSelection, submitCompoundBuild,
   logAction, completeSession,
-  getSession, getSessionReport, getUserSessions, requestHint,
+  getSession, getSessionReport, getUserSessions, getSessionStats, requestHint,
 } = require("../controllers/session.controller");
 const { protect } = require("../middleware/auth");
 
 router.use(protect);
 
 router.post("/start", startSession);
+router.get("/stats", getSessionStats);
 router.get("/history", getUserSessions);
 router.get("/:id", getSession);
 router.get("/:id/report", getSessionReport);
