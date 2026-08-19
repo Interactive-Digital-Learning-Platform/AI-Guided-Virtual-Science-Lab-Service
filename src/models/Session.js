@@ -91,6 +91,28 @@ const sessionSchema = new mongoose.Schema(
         lastMisconceptionCode: { type: String, default: null },
       },
     ],
+
+    // Per-step behavioral record for the procedure phase — one entry per stepId, created lazily
+    // the first time the student attempts that step (see evaluateStepOnBench / logAction in
+    // session.controller.js). Distinct from behaviorFeatures above (a session-wide aggregate):
+    // this is what lets completeSession score "solved it first try" higher than "needed 3 hints",
+    // and what the research/analytics side needs to see mistakes at the individual-step level.
+    stepProgress: [
+      {
+        stepId: { type: Number, required: true },
+        equipmentMistakes: { type: Number, default: 0 },
+        chemicalMistakes: { type: Number, default: 0 },
+        hintsRequested: { type: Number, default: 0 },
+        highestHintLevel: { type: Number, default: 0 },
+        solvedIndependently: { type: Boolean, default: true }, // flipped false on the first mistake or hint
+        startedAt: { type: Date, default: null },
+        completedAt: { type: Date, default: null },
+        timeSpentSeconds: { type: Number, default: 0 },
+        // 100 minus mistake/hint deductions, floored at 0 — see computeStepScore in
+        // session.controller.js. Averaged across steps into Session.score at completion.
+        stepScore: { type: Number, default: 100 },
+      },
+    ],
   },
   { timestamps: true }
 );

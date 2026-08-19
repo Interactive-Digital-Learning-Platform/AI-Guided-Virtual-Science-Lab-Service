@@ -1,25 +1,13 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-let genAI = null;
-
-const getGenAI = () => {
-  if (!genAI && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "your_gemini_api_key_here") {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  }
-  return genAI;
-};
+const { isConfigured, generateText } = require("./groqClient");
 
 /**
- * Generate personalized natural-language feedback using Gemini
+ * Generate personalized natural-language feedback using Groq
  */
 const generateFeedback = async ({ experimentTitle, score, misconceptions, strengths, grade }) => {
-  const client = getGenAI();
-  if (!client) {
-    // Return rule-based feedback if Gemini is not configured
+  if (!isConfigured()) {
+    // Return rule-based feedback if Grok is not configured
     return buildRuleBasedFeedback(experimentTitle, score, misconceptions, strengths);
   }
-
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const misconceptionText =
     misconceptions.length > 0
@@ -49,11 +37,9 @@ Write a short, encouraging 3-4 sentence feedback message.
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+    return await generateText(prompt);
   } catch (error) {
-    console.error("Gemini API error:", error.message);
+    console.error("Groq API error:", error.message);
     return buildRuleBasedFeedback(experimentTitle, score, misconceptions, strengths);
   }
 };

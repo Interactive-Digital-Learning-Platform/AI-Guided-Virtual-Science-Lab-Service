@@ -20,7 +20,7 @@ const getExperiments = async (req, res, next) => {
       Experiment.find(filter)
         // Exclude fields that would reveal the equipment/chemical selection answers or step
       
-        .select("-steps.hints -steps.misconceptionRisks -requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction")
+        .select("-steps.hints -steps.misconceptionRisks -requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction -steps.requiredEquipment")
         .sort({ subject: 1, difficulty: 1 })
         .skip(skip)
         .limit(parseInt(limit))
@@ -38,12 +38,35 @@ const getExperiments = async (req, res, next) => {
   }
 };
 
+// GET /api/experiments/:id/info — "read before you experiment" pre-lab view. Unlike
+// getExperimentById below, this deliberately includes requiredEquipment/requiredChemicals
+// (and theory/keyConcepts), since it's shown outside the equipment/chemical-selection UI and
+// isn't testing the student — it's meant to prepare them before they start the guided flow.
+const getExperimentInfo = async (req, res, next) => {
+  try {
+    const experiment = await Experiment.findById(req.params.id)
+      .select(
+        "title subject grades difficulty estimatedTime description objectives lesson theory keyConcepts requiredEquipment requiredChemicals expectedObservations safetyInformation thumbnailColor"
+      )
+      .populate("requiredChemicals.chemical", "name symbol formula category state safetyClassification hazardInfo")
+      .lean();
+
+    if (!experiment) {
+      return res.status(404).json({ success: false, message: "Experiment not found." });
+    }
+
+    res.status(200).json({ success: true, data: experiment });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // GET /api/experiments/:id
 
 const getExperimentById = async (req, res, next) => {
   try {
     const experiment = await Experiment.findById(req.params.id)
-      .select("-requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction")
+      .select("-requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction -steps.requiredEquipment")
       .populate("relatedConcepts", "name description simpleExplanation visualizationAvailable")
       .lean();
 
@@ -71,6 +94,12 @@ const getExperimentsBySubject = async (req, res, next) => {
       subject,
       isActive: true,
       grades: userGrade,
+      // Excludes legacy/generic experiments (e.g. "Acid-Base Titration", "Separating Mixtures by
+      // Filtration" in data/experiments.js) that predate the equipment/chemical-selection guided
+      // flow and were never given a requiredEquipment list — without this, a student could open
+      // one and find equipment selection impossible to pass, since every item they pick would be
+      // flagged "unnecessary" against an empty requirements list.
+      "requiredEquipment.0": { $exists: true },
     })
       .select("title difficulty estimatedTime description thumbnailColor totalAttempts averageScore grades")
       .sort({ difficulty: 1 })
@@ -127,4 +156,4 @@ const getCompoundBuildTemplate = async (req, res, next) => {
   }
 };
 
-module.exports = { getExperiments, getExperimentById, getExperimentsBySubject, getCompoundBuildTemplate };
+module.exports = { getExperiments, getExperimentById, getExperimentInfo, getExperimentsBySubject, getCompoundBuildTemplate };
