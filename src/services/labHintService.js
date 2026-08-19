@@ -1,13 +1,4 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-let genAI = null;
-
-const getGenAI = () => {
-  if (!genAI && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "your_gemini_api_key_here") {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  }
-  return genAI;
-};
+const { isConfigured, generateText } = require("./groqClient");
 
 const hintLevelForAttempts = (attempts) => Math.min(attempts, 3);
 
@@ -19,11 +10,9 @@ const hintLevelForAttempts = (attempts) => Math.min(attempts, 3);
  */
 const generateSelectionHint = async ({ phase, experimentTitle, relatedConcepts, missingCount, unnecessaryCount, attempts }) => {
   const level = hintLevelForAttempts(attempts);
-  const client = getGenAI();
 
-  if (!client) return buildFallbackSelectionHint(phase, level, missingCount, unnecessaryCount);
+  if (!isConfigured()) return buildFallbackSelectionHint(phase, level, missingCount, unnecessaryCount);
 
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
   const conceptText = relatedConcepts.length > 0 ? relatedConcepts.join(", ") : "the experiment's purpose";
 
   const prompt = `
@@ -44,11 +33,9 @@ Do not use quotation marks in your answer.
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+    return await generateText(prompt);
   } catch (error) {
-    console.error("Gemini API error:", error.message);
+    console.error("Groq API error:", error.message);
     return buildFallbackSelectionHint(phase, level, missingCount, unnecessaryCount);
   }
 };
@@ -74,11 +61,9 @@ const buildFallbackSelectionHint = (phase, level, missingCount, unnecessaryCount
  * heating, repeated mistakes. Rule-based trigger selection, optionally Gemini-phrased.
  */
 const generateInterventionHint = async ({ triggerType, experimentTitle, context }) => {
-  const client = getGenAI();
   const fallback = buildFallbackIntervention(triggerType, context);
-  if (!client) return fallback;
+  if (!isConfigured()) return fallback;
 
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
   const prompt = `
 You are a science teacher supervising a student's virtual experiment "${experimentTitle}".
 The student just triggered a "${triggerType}" safety/process check. Context: ${JSON.stringify(context)}.
@@ -88,11 +73,9 @@ not an instruction, and not revealing what to do next. Do not use quotation mark
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+    return await generateText(prompt);
   } catch (error) {
-    console.error("Gemini API error:", error.message);
+    console.error("Groq API error:", error.message);
     return fallback;
   }
 };
@@ -133,11 +116,9 @@ const classifyCompoundBuildMistake = ({ reactantCoefficients, productCoefficient
  */
 const generateCompoundBuildHint = async ({ compoundName, attempts, misconceptionCode }) => {
   const level = hintLevelForAttempts(attempts);
-  const client = getGenAI();
 
-  if (!client) return buildFallbackCompoundHint(compoundName, level, misconceptionCode);
+  if (!isConfigured()) return buildFallbackCompoundHint(compoundName, level, misconceptionCode);
 
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
   const focusHint =
     misconceptionCode === "CHEM_BUILD_002"
       ? "The student appears to have left every coefficient at 1 without counting atoms on each side."
@@ -160,11 +141,9 @@ Do not use quotation marks in your answer.
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+    return await generateText(prompt);
   } catch (error) {
-    console.error("Gemini API error:", error.message);
+    console.error("Groq API error:", error.message);
     return buildFallbackCompoundHint(compoundName, level, misconceptionCode);
   }
 };
@@ -220,11 +199,9 @@ const generateEquipmentHint = async ({
   benchEquipmentTypes,
   level,
 }) => {
-  const client = getGenAI();
   const fallback = buildFallbackEquipmentHint({ level, stepActionType, requiredEquipment, benchEquipmentTypes });
-  if (!client) return fallback;
+  if (!isConfigured()) return fallback;
 
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
   const benchText = benchEquipmentTypes.length ? benchEquipmentTypes.join(", ") : "nothing yet";
 
   const prompt = `
@@ -243,11 +220,9 @@ Do not use quotation marks. Never mention any of: ${requiredEquipment.join(", ")
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+    return await generateText(prompt);
   } catch (error) {
-    console.error("Gemini API error:", error.message);
+    console.error("Groq API error:", error.message);
     return fallback;
   }
 };
@@ -282,11 +257,8 @@ const generateChemicalHint = async ({
   requiredChemicalCategories,
   level,
 }) => {
-  const client = getGenAI();
   const fallback = buildFallbackChemicalHint({ level, requiredChemicalCategories });
-  if (!client) return fallback;
-
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
+  if (!isConfigured()) return fallback;
 
   const prompt = `
 You are a science teacher standing beside a student during a virtual "${experimentTitle}" practical.
@@ -304,11 +276,9 @@ Do not use quotation marks.
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+    return await generateText(prompt);
   } catch (error) {
-    console.error("Gemini API error:", error.message);
+    console.error("Groq API error:", error.message);
     return fallback;
   }
 };

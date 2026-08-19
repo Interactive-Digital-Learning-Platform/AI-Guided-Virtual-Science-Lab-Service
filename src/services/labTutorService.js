@@ -1,13 +1,4 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-let genAI = null;
-
-const getGenAI = () => {
-  if (!genAI && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "your_gemini_api_key_here") {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  }
-  return genAI;
-};
+const { isConfigured, generateText } = require("./groqClient");
 
 /**
  * Generates a Reactive-Mode AI Tutor response using live lab state as context, per the
@@ -15,12 +6,9 @@ const getGenAI = () => {
  * conversation -> student question.
  */
 const generateTutorResponse = async ({ chemicalsPresent, recentActions, conversationHistory, question, grade }) => {
-  const client = getGenAI();
-  if (!client) {
+  if (!isConfigured()) {
     return buildFallbackTutorResponse(chemicalsPresent, question);
   }
-
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const chemicalsText =
     chemicalsPresent.length > 0
@@ -61,11 +49,9 @@ Answer the student's question directly, using the lab state above as context whe
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+    return await generateText(prompt);
   } catch (error) {
-    console.error("Gemini API error:", error.message);
+    console.error("Groq API error:", error.message);
     return buildFallbackTutorResponse(chemicalsPresent, question);
   }
 };
