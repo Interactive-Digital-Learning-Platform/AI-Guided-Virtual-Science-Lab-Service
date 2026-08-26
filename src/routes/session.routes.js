@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   startSession, submitEquipmentSelection, submitChemicalSelection, submitCompoundBuild,
   logAction, completeSession,
-  getSession, getSessionReport, getUserSessions, getSessionStats, requestHint,
+  getSession, getSessionReport, getUserSessions, getSessionStats, requestHint, requestHelp,
 } = require("../controllers/session.controller");
 const { protect } = require("../middleware/auth");
 
@@ -20,5 +20,6 @@ router.post("/:id/compound-builds", submitCompoundBuild);
 router.post("/:id/action", logAction);
 router.post("/:id/complete", completeSession);
 router.post("/:id/hint", requestHint);
+router.post("/:id/help", requestHelp);
 
 module.exports = router;

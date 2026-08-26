@@ -12,6 +12,12 @@ const sessionSchema = new mongoose.Schema(
       default: "in_progress",
     },
     currentStep: { type: Number, default: 1 },
+    // Which Current Task (microStep) within currentStep the student is on right now — 1-based,
+    // resets to 1 whenever currentStep advances. Authoritative the same way currentStep is: the
+    // client submits an action against a stepId/microStepId, but only a match against these two
+    // fields is ever graded as "the current task" (see logAction in session.controller.js). For
+    // a step with no microSteps defined (unmigrated practicals), this stays irrelevant/unused.
+    currentMicroStep: { type: Number, default: 1 },
     score: { type: Number, default: 0, min: 0, max: 100 },
     totalTime: { type: Number, default: 0 }, // seconds
     actions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Action" }],
@@ -93,7 +99,7 @@ const sessionSchema = new mongoose.Schema(
     ],
 
     // Per-step behavioral record for the procedure phase — one entry per stepId, created lazily
-    // the first time the student attempts that step (see evaluateStepOnBench / logAction in
+    // the first time the student attempts that step (see evaluateOnBench / logAction in
     // session.controller.js). Distinct from behaviorFeatures above (a session-wide aggregate):
     // this is what lets completeSession score "solved it first try" higher than "needed 3 hints",
     // and what the research/analytics side needs to see mistakes at the individual-step level.
@@ -104,6 +110,10 @@ const sessionSchema = new mongoose.Schema(
         chemicalMistakes: { type: Number, default: 0 },
         hintsRequested: { type: Number, default: 0 },
         highestHintLevel: { type: Number, default: 0 },
+        // Whether the Help reveal (requestHelp) was used on this step — only reachable once
+        // highestHintLevel has already reached 3, see session.controller.js. Drives the -25%
+        // score deduction in computeStepScore, taking priority over the hint-level deductions.
+        helpUsed: { type: Boolean, default: false },
         solvedIndependently: { type: Boolean, default: true }, // flipped false on the first mistake or hint
         startedAt: { type: Date, default: null },
         completedAt: { type: Date, default: null },
@@ -111,6 +121,26 @@ const sessionSchema = new mongoose.Schema(
         // 100 minus mistake/hint deductions, floored at 0 — see computeStepScore in
         // session.controller.js. Averaged across steps into Session.score at completion.
         stepScore: { type: Number, default: 100 },
+        // Per-Current-Task behavioral record, one entry per microStepId under this step — created
+        // lazily on first touch (getOrCreateMicroStepProgress), same pattern as stepProgress
+        // itself. This is the analytics home for microStepAttempts/microStepErrors/hintsRequested/
+        // hintLevelReached/timePerMicroStep/retriesPerMicroStep (research metrics, see
+        // getSessionReport's microStepBreakdown). Empty for steps with no microSteps defined.
+        microSteps: [
+          {
+            microStepId: { type: Number, required: true },
+            equipmentMistakes: { type: Number, default: 0 },
+            chemicalMistakes: { type: Number, default: 0 },
+            hintsRequested: { type: Number, default: 0 },
+            highestHintLevel: { type: Number, default: 0 },
+            helpUsed: { type: Boolean, default: false },
+            solvedIndependently: { type: Boolean, default: true },
+            startedAt: { type: Date, default: null },
+            completedAt: { type: Date, default: null },
+            timeSpentSeconds: { type: Number, default: 0 },
+            taskScore: { type: Number, default: 100 },
+          },
+        ],
       },
     ],
   },

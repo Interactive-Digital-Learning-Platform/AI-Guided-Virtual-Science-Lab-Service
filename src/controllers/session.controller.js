@@ -8,32 +8,57 @@ const Reaction = require("../models/Reaction");
 const LabRun = require("../models/LabRun");
 const { analyzeSession } = require("../services/aiService");
 const { generateFeedback } = require("../services/feedbackService");
+const { resolvePhysicsMeasurement: resolveMechanicsMeasurement, checkMeasurementTolerance } = require("../services/mechanicsEngine");
+const { resolvePhysicsMeasurement: resolveCircuitMeasurement, evaluateBoard } = require("../services/circuitEngine");
+
+// Each engine only knows how to resolve its own metrics — dispatch by metric name rather than by
+// subject/evaluationEngine, so a microStep's expectedMeasurement.metric alone determines which
+// engine's bench-reading logic applies (mirrors mechanicsEngine.js/circuitEngine.js each owning a
+// disjoint metric set).
+const CIRCUIT_METRICS = new Set(["current", "voltage", "resistance"]);
+const resolvePhysicsMeasurement = (args) =>
+  CIRCUIT_METRICS.has(args.metric) ? resolveCircuitMeasurement(args) : resolveMechanicsMeasurement(args);
 const {
   generateSelectionHint,
   generateCompoundBuildHint,
   classifyCompoundBuildMistake,
   generateEquipmentHint,
   generateChemicalHint,
+  generateTaskHint,
+  generateCircuitHint,
 } = require("../services/labHintService");
 
-// Reads the live bench (LabRun.equipment) once and evaluates a step's requiredEquipment /
-// requiredChemicalsForStep against it — the single source of truth both logAction (does this
-// attempt complete the step) and requestHint (which kind of hint is actually relevant right now)
-// build on, so the two never disagree about what's missing. Chemical presence is checked
-// bench-wide (any equipment instance's contents), not per-container, since the workspace's
-// drag-drop model doesn't simulate transferring a chemical between containers — dropping it onto
-// any instance counts as "introduced." Equipment presence is likewise bench-wide: any instance
-// whose type is in requiredEquipment satisfies that requirement, regardless of which instance the
-// chemicals ended up in.
-const evaluateStepOnBench = async (step, labRunId) => {
-  const labRun = labRunId ? await LabRun.findById(labRunId).select("equipment reactionsTriggered").lean() : null;
-  const benchEquipmentTypes = [...new Set((labRun?.equipment || []).map((e) => e.equipmentType))];
+// Reads the live bench (LabRun.equipment) once and evaluates a *set of requirements* against it —
+// the single source of truth both logAction (does this attempt complete the current unit) and
+// requestHint (which kind of hint is actually relevant right now) build on, so the two never
+// disagree about what's missing. Chemical presence is checked bench-wide (any equipment instance's
+// contents), not per-container, since the workspace's drag-drop model doesn't simulate transferring
+// a chemical between containers — dropping it onto any instance counts as "introduced." Equipment
+// presence is likewise bench-wide: any instance whose type is in requiredEquipment satisfies that
+// requirement, regardless of which instance the chemicals ended up in.
+//
+// Deliberately parameterized on a plain { equipment, chemicals } pair rather than a step/microStep
+// doc directly — resolveGradingTarget below decides which requirement set applies (a microStep's
+// own expectedEquipment/expectedChemicalsForStep when the step has been migrated, or the whole
+// step's requiredEquipment/requiredChemicalsForStep otherwise), so this stays agnostic to that.
+const evaluateOnBench = async ({ equipment: requiredEquipment = [], chemicals: requiredChemicalIds = [] }, labRunId) => {
+  const labRun = labRunId
+    ? await LabRun.findById(labRunId).select("equipment physicsEquipment circuitBoardState reactionsTriggered").lean()
+    : null;
+  // Equipment presence is checked across both bench-state arrays — a physics LabRun only ever
+  // populates physicsEquipment, a chemistry one only ever populates equipment, so unioning them
+  // is safe for both subjects (see physicsInstanceSchema in LabRun.js for why they're separate).
+  const benchEquipmentTypes = [
+    ...new Set([
+      ...(labRun?.equipment || []).map((e) => e.equipmentType),
+      ...(labRun?.physicsEquipment || []).map((e) => e.equipmentType),
+    ]),
+  ];
   const benchChemicalIds = [
     ...new Set((labRun?.equipment || []).flatMap((e) => e.contents.map((c) => c.chemical.toString()))),
   ];
 
-  const requiredEquipment = step?.requiredEquipment || [];
-  const requiredChemicals = (step?.requiredChemicalsForStep || []).map((id) => id.toString());
+  const requiredChemicals = requiredChemicalIds.map((id) => id.toString());
 
   const equipmentOk = requiredEquipment.every((e) => benchEquipmentTypes.includes(e));
   const chemicalsOk = requiredChemicals.every((id) => benchChemicalIds.includes(id));
@@ -41,15 +66,62 @@ const evaluateStepOnBench = async (step, labRunId) => {
   return { labRun, benchEquipmentTypes, benchChemicalIds, equipmentOk, chemicalsOk };
 };
 
-// 100 minus deductions for equipment/chemical mistakes and hints used on this step, floored at 0.
-// Weights are deliberately simple/tunable: a student who solves a step first try with no help
-// scores 100; repeated wrong attempts and higher hint levels pull the step score down, so the
-// session-level score (average of these, see completeSession) reflects HOW a student got to the
-// right answer, not just whether they eventually did.
+// Resolves what "the current unit of work" actually requires for a given step, given the
+// session's authoritative currentMicroStep — the one place that decides between the new
+// micro-step-scoped grading and the legacy whole-step grading (steps with no microSteps defined,
+// i.e. practicals not yet migrated — see chemistryPracticals.js vs data/experiments.js). Returns
+// null microStep when the step has no microSteps, in which case callers grade the step itself
+// exactly as before microSteps existed.
+const resolveGradingTarget = (step, session) => {
+  const microSteps = step?.microSteps || [];
+  if (microSteps.length === 0) {
+    return {
+      usingMicroSteps: false,
+      microStep: null,
+      equipment: step?.requiredEquipment || [],
+      chemicals: step?.requiredChemicalsForStep || [],
+      requiresReactionCheck: step?.actionType === "mix" && (step?.requiredChemicalsForStep?.length || 0) > 0,
+      // Unmigrated (whole-step) practicals are chemistry-only today — no step-level measurement
+      // check exists yet, so this branch always reports false/null, same as before this field existed.
+      requiresMeasurementCheck: false,
+      expectedMeasurement: null,
+      requiresCircuitPlacementCheck: false,
+    };
+  }
+
+  // The server, never the client, decides which micro-step is "current" — this is what makes
+  // Current Tasks un-skippable even though the request body may carry its own microStepId.
+  const microStep = microSteps.find((ms) => ms.microStepId === session.currentMicroStep) || microSteps[0];
+  return {
+    usingMicroSteps: true,
+    microStep,
+    equipment: microStep?.expectedEquipment || [],
+    chemicals: microStep?.expectedChemicalsForStep || [],
+    requiresReactionCheck: !!microStep?.requiresReactionCheck,
+    // Physics sibling of requiresReactionCheck — see mechanicsEngine.js's resolvePhysicsMeasurement
+    // and its call site below in logAction.
+    requiresMeasurementCheck: !!microStep?.requiresMeasurementCheck,
+    expectedMeasurement: microStep?.expectedMeasurement || null,
+    // Electricity (Phase B): a PLACE_COMPONENT task is graded by actual slot correctness (see
+    // evaluateBoard), not just "is a resistor/ammeter/voltmeter present somewhere on the bench" —
+    // presence alone can't tell a correctly-wired circuit from a pile of components dropped
+    // anywhere, now that placement itself is never blocked (see place_component in
+    // labRun.controller.js).
+    requiresCircuitPlacementCheck: microStep?.expectedIntent === "PLACE_COMPONENT",
+  };
+};
+
+// Flat deduction table keyed off the highest level of help this step needed — a student who
+// solves a step with no hints scores 100; using the Help reveal always scores 75 regardless of
+// how many hints preceded it (Help is a single terminal deduction, not stacked on top of the
+// hint-level deductions), per the product's fixed scoring rule. Equipment/chemical mistake counts
+// no longer factor in directly — they're what drives highestHintLevel up in the first place (see
+// logAction's autoHintLevel), so they're already reflected here.
+const HINT_LEVEL_PENALTY = { 0: 0, 1: 5, 2: 10, 3: 15 };
 const computeStepScore = (stepEntry) => {
-  const mistakePenalty = 15 * (stepEntry.equipmentMistakes + stepEntry.chemicalMistakes);
-  const hintPenalty = 10 * stepEntry.highestHintLevel;
-  return Math.max(0, 100 - mistakePenalty - hintPenalty);
+  if (stepEntry.helpUsed) return 75;
+  const penalty = HINT_LEVEL_PENALTY[stepEntry.highestHintLevel] ?? 15;
+  return 100 - penalty;
 };
 
 // Finds this step's stepProgress entry, creating it (with startedAt) on first touch.
@@ -60,6 +132,34 @@ const getOrCreateStepProgress = (session, stepId) => {
     entry = session.stepProgress[session.stepProgress.length - 1];
   }
   return entry;
+};
+
+// Sibling to getOrCreateStepProgress, one level deeper — finds this Current Task's nested
+// progress entry within its parent step's stepProgress, creating it on first touch. This is what
+// makes hint level / mistake counts naturally scoped (and therefore naturally reset) per
+// micro-step: a brand new microStepId always starts its own entry at highestHintLevel 0.
+const getOrCreateMicroStepProgress = (session, stepId, microStepId) => {
+  const stepEntry = getOrCreateStepProgress(session, stepId);
+  let entry = stepEntry.microSteps.find((mp) => mp.microStepId === microStepId);
+  if (!entry) {
+    stepEntry.microSteps.push({ microStepId, startedAt: new Date() });
+    entry = stepEntry.microSteps[stepEntry.microSteps.length - 1];
+  }
+  return { stepEntry, microStepEntry: entry };
+};
+
+// Resolves the single progress entry that mistakes/hints/completion should be recorded against
+// for "the current unit of work" — the nested microStep entry when the step is migrated, the
+// step's own entry otherwise (unmigrated practicals) — plus the parent stepEntry either way
+// (needed to roll step-level completion up once every Current Task under it is done). Shared by
+// logAction/requestHint/requestHelp so all three always agree on what "current" means.
+const resolveActiveProgress = (session, stepId, target, gradedMicroStepId) => {
+  if (target.usingMicroSteps) {
+    const { stepEntry, microStepEntry } = getOrCreateMicroStepProgress(session, stepId, gradedMicroStepId);
+    return { stepEntry, activeEntry: microStepEntry };
+  }
+  const stepEntry = getOrCreateStepProgress(session, stepId);
+  return { stepEntry, activeEntry: stepEntry };
 };
 
 // POST /api/sessions/start
@@ -359,6 +459,10 @@ const submitCompoundBuild = async (req, res, next) => {
 };
 
 // POST /api/sessions/:id/action
+// Body: { stepId, microStepId? (server-authoritative — see resolveGradingTarget; a client value
+// is only ever used to log what was attempted, never to pick which Current Task gets graded),
+// actionType, actionDetail, expectedAction, timeTaken, hintLevel, conceptViolated, equipmentType,
+// chemicalIds, quantity, unit }
 const logAction = async (req, res, next) => {
   try {
     let { stepId, actionType, actionDetail, expectedAction, timeTaken, hintLevel, conceptViolated } = req.body;
@@ -371,29 +475,35 @@ const logAction = async (req, res, next) => {
 
     const experiment = session.experimentId;
     const step = experiment.steps.find((s) => s.stepId === stepId);
+    // Which Current Task is "current" is decided by the server (session.currentMicroStep), never
+    // by whatever microStepId the client happened to send — see resolveGradingTarget. For a step
+    // with no microSteps (unmigrated practicals), target grades the whole step, exactly as before.
+    const target = step ? resolveGradingTarget(step, session) : null;
+    const gradedMicroStepId = target?.usingMicroSteps ? target.microStep.microStepId : null;
 
-    // The server determines correctness for every step type from the live bench — it never trusts
-    // a client-submitted "correct" claim (see evaluateStepOnBench). mismatchKind drives which
+    // The server determines correctness for every step/task type from the live bench — it never
+    // trusts a client-submitted "correct" claim (see evaluateOnBench). mismatchKind drives which
     // non-revealing hint (if any) comes back below: an equipment gap takes priority over a chemical
     // one, since a student can't have added the right chemical to equipment they haven't placed yet.
     let reactionResult = null;
+    let measurementResult = null;
     let mismatchKind = null;
     let benchEquipmentTypes = [];
 
     if (step) {
-      const evalResult = await evaluateStepOnBench(step, session.labRunId);
+      const evalResult = await evaluateOnBench({ equipment: target.equipment, chemicals: target.chemicals }, session.labRunId);
       benchEquipmentTypes = evalResult.benchEquipmentTypes;
 
       if (!evalResult.equipmentOk) {
         actionType = "incorrect";
         mismatchKind = "equipment";
         conceptViolated = conceptViolated || "LAB_MISSING_EQUIPMENT";
-      } else if (step.actionType === "mix" && step.requiredChemicalsForStep?.length > 0) {
-        // Equipment (and, per evalResult, ingredient presence) checks out — "mix" steps additionally
-        // require the actual reaction to have fired on the bench (reactionEngine.js), which is
-        // stricter chemistry grading than presence alone.
+      } else if (target.requiresReactionCheck) {
+        // Equipment (and, per evalResult, ingredient presence) checks out — a MIX_SUBSTANCES task
+        // additionally requires the actual reaction to have fired on the bench (reactionEngine.js),
+        // which is stricter chemistry grading than presence alone.
         const { buildReactantKey, serializeReactionMatch } = require("../services/reactionEngine");
-        const requiredKey = buildReactantKey(step.requiredChemicalsForStep.map((id) => id.toString()));
+        const requiredKey = buildReactantKey(target.chemicals.map((id) => id.toString()));
         const matchedReaction = evalResult.labRun?.reactionsTriggered?.length
           ? await Reaction.findOne({ _id: { $in: evalResult.labRun.reactionsTriggered }, reactantKey: requiredKey })
               .populate("reactants.chemical")
@@ -417,6 +527,51 @@ const logAction = async (req, res, next) => {
               explanation: "This combination hasn't happened on your bench yet — try it there first.",
               hint: null,
             };
+      } else if (target.requiresMeasurementCheck) {
+        // Physics sibling of the requiresReactionCheck branch above: instead of "did the right
+        // reaction fire," this checks "does the student's submitted value (quantity) match what
+        // the bench's own instruments actually measured/imply" — see mechanicsEngine.js.
+        const metric = target.expectedMeasurement?.metric;
+        const benchResult = resolvePhysicsMeasurement({
+          metric,
+          physicsEquipment: evalResult.labRun?.physicsEquipment || [],
+          circuitBoardState: evalResult.labRun?.circuitBoardState || null,
+        });
+        const expectedValue = benchResult.measurable ? benchResult.value : target.expectedMeasurement?.expectedValue;
+        const toleranceResult = checkMeasurementTolerance({
+          expectedValue,
+          studentValue: quantity,
+          tolerancePct: target.expectedMeasurement?.tolerancePct,
+        });
+
+        actionType = toleranceResult.correct ? "correct" : "incorrect";
+        if (!toleranceResult.correct) {
+          conceptViolated = conceptViolated || "PHY_MEASUREMENT_OUT_OF_TOLERANCE";
+        }
+        measurementResult = {
+          metric,
+          expectedValue,
+          studentValue: quantity ?? null,
+          correct: toleranceResult.correct,
+          reason: benchResult.measurable ? toleranceResult.reason : benchResult.reason,
+        };
+      } else if (target.requiresCircuitPlacementCheck) {
+        // Equipment presence alone ("is a resistor/ammeter/voltmeter on the bench somewhere")
+        // can't tell a correctly-wired circuit from components dropped in arbitrary slots — check
+        // the live board state instead. A slot filled with the wrong-role component counts the
+        // same as an unfilled one here (both mean "not correctly built yet"); the distinction
+        // between "missing" and "misplaced" is only used by the hint text below, never revealed
+        // as a pass/fail signal itself.
+        const boardResult = evaluateBoard({
+          boardId: step.circuitBoardId,
+          filledSlots: evalResult.labRun?.circuitBoardState?.filledSlots || [],
+          physicsEquipment: evalResult.labRun?.physicsEquipment || [],
+        });
+        actionType = boardResult.correct ? "correct" : "incorrect";
+        if (!boardResult.correct) {
+          conceptViolated = conceptViolated || "PHY_CIRCUIT_MISCONFIGURED";
+          mismatchKind = "circuit_placement";
+        }
       } else if (!evalResult.chemicalsOk) {
         actionType = "incorrect";
         mismatchKind = "chemical";
@@ -426,10 +581,11 @@ const logAction = async (req, res, next) => {
       }
     }
 
-    // Count attempts for this step in this session
+    // Count attempts for this Current Task (or, for unmigrated steps, this step) in this session.
     const stepAttempts = await Action.countDocuments({
       sessionId: session._id,
       stepId,
+      microStepId: gradedMicroStepId,
       actionType: { $in: ["correct", "incorrect"] },
     });
 
@@ -438,6 +594,7 @@ const logAction = async (req, res, next) => {
       userId: req.user._id,
       experimentId: experiment._id,
       stepId,
+      microStepId: gradedMicroStepId,
       actionType,
       actionDetail: actionDetail || "",
       expectedAction: expectedAction || "",
@@ -463,79 +620,155 @@ const logAction = async (req, res, next) => {
       session.behaviorFeatures.struggledSteps.push(stepId);
     }
 
-    // Per-step behavioral tracking (Session.stepProgress) — mistakes/hints/timing feed both the
-    // automatic hint below and completeSession's scoring (computeStepScore). autoHintLevel is
-    // computed here (mistakes so far, capped at 3) so the intervention block below and the score
-    // deduction always agree on what level was actually shown.
-    const stepEntry = step ? getOrCreateStepProgress(session, stepId) : null;
-    let autoHintLevel = null;
-    if (stepEntry && actionType === "incorrect" && mismatchKind) {
-      if (mismatchKind === "equipment") stepEntry.equipmentMistakes += 1;
-      else if (mismatchKind === "chemical") stepEntry.chemicalMistakes += 1;
-      stepEntry.solvedIndependently = false;
-      autoHintLevel = Math.min(stepEntry.equipmentMistakes + stepEntry.chemicalMistakes, 3);
-      stepEntry.highestHintLevel = Math.max(stepEntry.highestHintLevel, autoHintLevel);
+    // Behavioral tracking (Session.stepProgress) — mistakes/hints/timing feed both the automatic
+    // hint below and completeSession's scoring (computeStepScore). For a migrated step, this
+    // tracks the *current Current Task* specifically (activeEntry = the nested microStep entry),
+    // which is what makes hint level / mistake counts naturally reset the moment the task changes
+    // — a brand new microStepId always starts its own entry at highestHintLevel 0. For an
+    // unmigrated step, activeEntry is the step's own entry, exactly as before microSteps existed.
+    let stepEntry = null;
+    let activeEntry = null;
+    if (step) {
+      ({ stepEntry, activeEntry } = resolveActiveProgress(session, stepId, target, gradedMicroStepId));
     }
 
-    // Advance step if correct — incorrect attempts (wrong equipment, wrong chemical, or an
-    // unfired reaction) never advance currentStep, so the next step stays locked until this one is
-    // genuinely satisfied.
-    if (actionType === "correct" && stepId === session.currentStep) {
-      session.currentStep = stepId + 1;
+    let autoHintLevel = null;
+    if (activeEntry && actionType === "incorrect" && mismatchKind) {
+      // circuit_placement reuses the equipment counter — it's still fundamentally a "wrong
+      // equipment configuration" mistake, and adding a dedicated counter would need a Session
+      // schema change for no behavioral difference in the escalation math below.
+      if (mismatchKind === "equipment" || mismatchKind === "circuit_placement") activeEntry.equipmentMistakes += 1;
+      else if (mismatchKind === "chemical") activeEntry.chemicalMistakes += 1;
+      activeEntry.solvedIndependently = false;
+      autoHintLevel = Math.min(activeEntry.equipmentMistakes + activeEntry.chemicalMistakes, 3);
+      activeEntry.highestHintLevel = Math.max(activeEntry.highestHintLevel, autoHintLevel);
     }
-    if (stepEntry && actionType === "correct" && !stepEntry.completedAt) {
+
+    // Mark this Current Task (or, for unmigrated steps, the step itself) complete the moment it's
+    // solved — mirrors the original unconditional-on-correctness completion marking, independent
+    // of whether this happened to be the session's current position.
+    let isLastMicroStep = false;
+    let sortedMicroSteps = [];
+    if (target?.usingMicroSteps) {
+      sortedMicroSteps = [...step.microSteps].sort((a, b) => a.microStepId - b.microStepId);
+      isLastMicroStep = sortedMicroSteps[sortedMicroSteps.length - 1]?.microStepId === gradedMicroStepId;
+    }
+
+    if (activeEntry && actionType === "correct" && !activeEntry.completedAt) {
+      activeEntry.completedAt = new Date();
+      activeEntry.timeSpentSeconds = activeEntry.startedAt
+        ? Math.round((activeEntry.completedAt.getTime() - activeEntry.startedAt.getTime()) / 1000)
+        : timeTaken || 0;
+      if (target.usingMicroSteps) activeEntry.taskScore = computeStepScore(activeEntry);
+      else activeEntry.stepScore = computeStepScore(activeEntry);
+    }
+
+    // Roll the parent step's own completion/score up once its last Current Task is solved — the
+    // step's stepScore becomes the average of its tasks' scores, same "100 minus deductions"
+    // spirit as computeStepScore, just aggregated one level up.
+    if (target?.usingMicroSteps && isLastMicroStep && actionType === "correct" && stepEntry && !stepEntry.completedAt) {
       stepEntry.completedAt = new Date();
       stepEntry.timeSpentSeconds = stepEntry.startedAt
         ? Math.round((stepEntry.completedAt.getTime() - stepEntry.startedAt.getTime()) / 1000)
         : timeTaken || 0;
-      stepEntry.stepScore = computeStepScore(stepEntry);
+      stepEntry.stepScore = stepEntry.microSteps.length
+        ? Math.round(stepEntry.microSteps.reduce((sum, m) => sum + m.taskScore, 0) / stepEntry.microSteps.length)
+        : 100;
+    }
+
+    // Advance session position — incorrect attempts (wrong equipment, wrong chemical, or an
+    // unfired reaction) never advance anything, and correct attempts only advance when they're for
+    // the session's actual current position (server-authoritative, same guard as before microSteps
+    // existed) — this is what makes skipping ahead to a future Current Task or Main Step impossible
+    // even though the request body carries its own stepId/microStepId.
+    if (actionType === "correct" && stepId === session.currentStep) {
+      if (target.usingMicroSteps) {
+        if (isLastMicroStep) {
+          session.currentStep = stepId + 1;
+          session.currentMicroStep = 1;
+        } else {
+          const currentIndex = sortedMicroSteps.findIndex((ms) => ms.microStepId === gradedMicroStepId);
+          session.currentMicroStep = sortedMicroSteps[currentIndex + 1].microStepId;
+        }
+      } else {
+        session.currentStep = stepId + 1;
+      }
     }
 
     await session.save();
 
-    // Real-time hint trigger: if 2+ errors on same step, suggest hint
-    const stepErrors = await Action.countDocuments({ sessionId: session._id, stepId, actionType: "incorrect" });
+    // Real-time hint trigger: if 2+ errors on the same Current Task, suggest hint
+    const stepErrors = await Action.countDocuments({
+      sessionId: session._id,
+      stepId,
+      microStepId: gradedMicroStepId,
+      actionType: "incorrect",
+    });
     const suggestHint = stepErrors >= 2;
 
     // Event-driven proactive intervention — at most one per action, checked in priority order. A
-    // step-level equipment/chemical mismatch (detected above) always takes priority: it's the most
+    // task-level equipment/chemical mismatch (detected above) always takes priority: it's the most
     // specific, directly-actionable signal, and fires on the very first wrong attempt rather than
     // waiting for repeated mistakes, escalating level with each subsequent one (Stage 4/5).
     let intervention = null;
     const { generateInterventionHint } = require("../services/labHintService");
+    // Hints reference the Main Step's title for context but the actual prompt the student is
+    // solving right now — the Current Task's studentPrompt when migrated, the step's own
+    // instruction otherwise — so the hint stays scoped to what's actually being asked.
+    const activePrompt = target?.usingMicroSteps ? target.microStep.studentPrompt : step?.instruction;
 
     if (mismatchKind === "equipment") {
       intervention = {
         type: "equipment_hint",
+        level: autoHintLevel,
         hint: await generateEquipmentHint({
           experimentTitle: experiment.title,
           stepTitle: step.title,
-          stepInstruction: step.instruction,
+          stepInstruction: activePrompt,
           stepActionType: step.actionType,
-          requiredEquipment: step.requiredEquipment,
+          requiredEquipment: target.equipment,
           benchEquipmentTypes,
           level: autoHintLevel,
         }),
       };
     } else if (mismatchKind === "chemical") {
-      const requiredChemicalDocs = step.requiredChemicalsForStep?.length
-        ? await Chemical.find({ _id: { $in: step.requiredChemicalsForStep } }).select("category").lean()
+      const requiredChemicalDocs = target.chemicals?.length
+        ? await Chemical.find({ _id: { $in: target.chemicals } }).select("category").lean()
         : [];
       intervention = {
         type: "chemical_hint",
+        level: autoHintLevel,
         hint: await generateChemicalHint({
           experimentTitle: experiment.title,
           stepTitle: step.title,
-          stepInstruction: step.instruction,
+          stepInstruction: activePrompt,
           stepActionType: step.actionType,
           requiredChemicalCategories: [...new Set(requiredChemicalDocs.map((c) => c.category))],
           level: autoHintLevel,
         }),
       };
-    } else if (step?.actionType === "mix" && reactionResult && !reactionResult.found && reactionResult.reason === "no_known_reaction") {
+    } else if (mismatchKind === "circuit_placement") {
+      // Deliberately doesn't say WHICH slot is wrong or WHAT belongs there — that's the whole
+      // point of removing the answer-revealing slot labels. Progressively less abstract as level
+      // rises, same escalation shape as equipment/chemical hints, gated the same way.
+      intervention = {
+        type: "circuit_hint",
+        level: autoHintLevel,
+        hint: await generateCircuitHint({
+          experimentTitle: experiment.title,
+          stepTitle: step.title,
+          stepInstruction: activePrompt,
+          level: autoHintLevel,
+        }),
+      };
+    } else if (target?.requiresReactionCheck && reactionResult && !reactionResult.found && reactionResult.reason === "no_known_reaction") {
       intervention = {
         type: "unknown_combination",
-        hint: await generateInterventionHint({ triggerType: "unknown_combination", experimentTitle: experiment.title, context: { stepId } }),
+        hint: await generateInterventionHint({
+          triggerType: "unknown_combination",
+          experimentTitle: experiment.title,
+          context: { stepId, microStepId: gradedMicroStepId },
+        }),
       };
     } else if (step?.actionType === "heat" && experiment.reactionId) {
       const Reaction = require("../models/Reaction");
@@ -549,14 +782,27 @@ const logAction = async (req, res, next) => {
     } else if (stepErrors >= 3) {
       intervention = {
         type: "repeated_mistake",
-        hint: await generateInterventionHint({ triggerType: "repeated_mistake", experimentTitle: experiment.title, context: { stepId, attempts: stepErrors } }),
+        hint: await generateInterventionHint({
+          triggerType: "repeated_mistake",
+          experimentTitle: experiment.title,
+          context: { stepId, microStepId: gradedMicroStepId, attempts: stepErrors },
+        }),
       };
     }
 
     res.status(201).json({
       success: true,
       data: action,
-      meta: { suggestHint, stepErrors, currentStep: session.currentStep, reactionResult, intervention },
+      meta: {
+        suggestHint,
+        stepErrors,
+        currentStep: session.currentStep,
+        currentMicroStep: session.currentMicroStep,
+        reactionResult,
+        measurementResult,
+        intervention,
+        helpAvailable: (activeEntry?.highestHintLevel || 0) >= 3,
+      },
     });
   } catch (error) {
     next(error);
@@ -655,6 +901,25 @@ const getSessionReport = async (req, res, next) => {
     const proceduralErrors = actions.filter((a) => a.actionType === "incorrect" && (!a.conceptViolated || a.conceptViolated.startsWith("PROC")));
     const conceptualErrors = session.aiFeedback.misconceptionsDetected || [];
 
+    // Research-facing per-Current-Task metrics (spec: microStepAttempts/microStepErrors/
+    // hintsRequested/hintLevelReached/timePerMicroStep/retriesPerMicroStep) — sourced straight
+    // from Session.stepProgress[].microSteps[], no separate analytics collection needed. Empty
+    // for practicals not yet migrated to microSteps.
+    const microStepBreakdown = (session.stepProgress || []).flatMap((sp) =>
+      (sp.microSteps || []).map((mp) => ({
+        stepId: sp.stepId,
+        microStepId: mp.microStepId,
+        equipmentMistakes: mp.equipmentMistakes,
+        chemicalMistakes: mp.chemicalMistakes,
+        hintsRequested: mp.hintsRequested,
+        highestHintLevel: mp.highestHintLevel,
+        helpUsed: mp.helpUsed,
+        solvedIndependently: mp.solvedIndependently,
+        timeSpentSeconds: mp.timeSpentSeconds,
+        taskScore: mp.taskScore,
+      }))
+    );
+
     res.status(200).json({
       success: true,
       data: {
@@ -672,6 +937,7 @@ const getSessionReport = async (req, res, next) => {
         equipmentUsed,
         chemicalsUsed,
         procedureFollowed: experiment.steps.map((s) => ({ stepId: s.stepId, title: s.title, instruction: s.instruction })),
+        microStepBreakdown,
         observations: experiment.expectedObservations || [],
         errorsDetected: {
           procedural: proceduralErrors.map((a) => ({ stepId: a.stepId, detail: a.actionDetail })),
@@ -695,15 +961,50 @@ const getSession = async (req, res, next) => {
   try {
     const session = await Session.findById(req.params.id)
       // Pure-exclusion select (Mongo disallows mixing inclusion/exclusion outside sub-paths of
-      // the same field) — excludes the mix-step "answer" fields, same reasoning as
-      // getExperimentById. Everything else on Experiment is included, which is fine here.
+      // the same field) — excludes the step/microStep "answer" fields, same reasoning as
+      // getExperimentById. Everything else on Experiment is included, which is fine here —
+      // microSteps.studentPrompt/microStepId in particular are safe to include, same as
+      // steps.title/instruction above them.
       .populate(
         "experimentId",
-        "-requiredEquipment -requiredChemicals -reactionId -steps.expectedAction -steps.requiredChemicalsForStep -steps.requiredEquipment"
+        "-requiredEquipment -requiredChemicals -reactionId -steps.expectedAction -steps.requiredChemicalsForStep -steps.requiredEquipment -steps.exactAnswer -steps.observationGoal -steps.microSteps.expectedIntent -steps.microSteps.expectedEquipment -steps.microSteps.expectedChemicalsForStep -steps.microSteps.hints -steps.microSteps.exactAnswer -steps.microSteps.expectedMeasurement"
       )
       .lean();
     if (!session) return res.status(404).json({ success: false, message: "Session not found." });
-    res.status(200).json({ success: true, data: session });
+
+    // Computed, already-safe "what to show right now" block — spares the frontend from having to
+    // locate the current Main Step/Current Task inside experimentId.steps itself, and from ever
+    // needing the excluded answer fields to know what to render (see workspace.tsx). `task` is
+    // null for a Main Step with no microSteps defined — the frontend then just shows the Main
+    // Step, exactly as it did before this feature existed.
+    const steps = session.experimentId?.steps || [];
+    const mainStep = steps.find((s) => s.stepId === session.currentStep) || null;
+    const sortedMicroSteps = mainStep?.microSteps?.length
+      ? [...mainStep.microSteps].sort((a, b) => a.microStepId - b.microStepId)
+      : [];
+    const microStep = sortedMicroSteps.find((ms) => ms.microStepId === session.currentMicroStep) || null;
+
+    const currentTask = mainStep
+      ? {
+          mainStep: {
+            stepId: mainStep.stepId,
+            title: mainStep.title,
+            instruction: mainStep.instruction,
+            order: steps.findIndex((s) => s.stepId === mainStep.stepId) + 1,
+            totalMainSteps: steps.length,
+          },
+          task: microStep
+            ? {
+                microStepId: microStep.microStepId,
+                prompt: microStep.studentPrompt,
+                order: sortedMicroSteps.findIndex((ms) => ms.microStepId === microStep.microStepId) + 1,
+                totalMicroSteps: sortedMicroSteps.length,
+              }
+            : null,
+        }
+      : null;
+
+    res.status(200).json({ success: true, data: { ...session, currentTask } });
   } catch (error) {
     next(error);
   }
@@ -808,6 +1109,8 @@ const getSessionStats = async (req, res, next) => {
 };
 
 // POST /api/sessions/:id/hint
+// Body: { stepId } — the Current Task being hinted is always session.currentMicroStep for that
+// step (server-authoritative, same as logAction), not anything the client could pass.
 const requestHint = async (req, res, next) => {
   try {
     const { stepId } = req.body;
@@ -817,51 +1120,84 @@ const requestHint = async (req, res, next) => {
     const step = session.experimentId.steps.find((s) => s.stepId === stepId);
     if (!step) return res.status(404).json({ success: false, message: "Step not found." });
 
-    // Determine hint level (escalate based on previous hints)
+    const target = resolveGradingTarget(step, session);
+    const gradedMicroStepId = target.usingMicroSteps ? target.microStep.microStepId : null;
+    const activePrompt = target.usingMicroSteps ? target.microStep.studentPrompt : step.instruction;
+
+    // Determine hint level (escalate based on previous hints on THIS Current Task specifically —
+    // scoping the count to (stepId, microStepId) is what makes the ladder start back at 0 the
+    // instant the task changes, satisfying the "hints reset per Current Task" requirement without
+    // any separate reset logic).
     const prevHints = await Action.countDocuments({
       sessionId: session._id,
       stepId,
+      microStepId: gradedMicroStepId,
       actionType: "hint_requested",
     });
     const hintLevel = Math.min(prevHints + 1, 3);
 
-    // Steps with requiredEquipment/requiredChemicalsForStep get a dynamic, context-aware hint
-    // (bench state + step purpose, via Gemini) instead of static authored text — see
-    // labHintService.js. Which of equipment/chemical is actually missing right now (same check
-    // logAction uses) decides which hint fires; if both are already satisfied, fall back to the
-    // equipment-flavored hint anyway (still useful — "how to use what you have"). Any step with
-    // neither field (none currently, but defensive for future data) falls back to the original
-    // static per-step hints.
+    // A task with an equipment/chemical gap gets a dynamic, context-aware hint (bench state +
+    // task purpose, via Gemini) instead of static authored text — see labHintService.js. Which of
+    // equipment/chemical is actually missing right now (same check logAction uses) decides which
+    // hint fires; if both are already satisfied, fall back to the equipment-flavored hint anyway
+    // (still useful — "how to use what you have"). A task with neither (e.g. OBSERVE_RESULT/
+    // MEASURE_RESULT/RECORD_RESULT — nothing to place on the bench) falls back to its own authored
+    // hints, then the shared generic task-hint generator.
     let hintText;
-    if (step.requiredEquipment?.length > 0 || step.requiredChemicalsForStep?.length > 0) {
-      const { equipmentOk, chemicalsOk, benchEquipmentTypes } = await evaluateStepOnBench(step, session.labRunId);
+    if (target.requiresCircuitPlacementCheck) {
+      // Electricity (Phase B): a PLACE_COMPONENT task's real gap is slot correctness, not
+      // equipment presence (the equipment usually already exists on the bench) — route straight
+      // to the circuit-aware hint rather than falling into the generic equipment-hint branch
+      // below, which would just say "you've got the right equipment" and stop there.
+      hintText = await generateCircuitHint({
+        experimentTitle: session.experimentId.title,
+        stepTitle: step.title,
+        stepInstruction: activePrompt,
+        level: hintLevel,
+      });
+    } else if (target.equipment.length > 0 || target.chemicals.length > 0) {
+      const { equipmentOk, chemicalsOk, benchEquipmentTypes } = await evaluateOnBench(
+        { equipment: target.equipment, chemicals: target.chemicals },
+        session.labRunId
+      );
 
       if (!equipmentOk || chemicalsOk) {
         hintText = await generateEquipmentHint({
           experimentTitle: session.experimentId.title,
           stepTitle: step.title,
-          stepInstruction: step.instruction,
+          stepInstruction: activePrompt,
           stepActionType: step.actionType,
-          requiredEquipment: step.requiredEquipment || [],
+          requiredEquipment: target.equipment,
           benchEquipmentTypes,
           level: hintLevel,
         });
       } else {
-        const requiredChemicalDocs = await Chemical.find({ _id: { $in: step.requiredChemicalsForStep } })
+        const requiredChemicalDocs = await Chemical.find({ _id: { $in: target.chemicals } })
           .select("category")
           .lean();
         hintText = await generateChemicalHint({
           experimentTitle: session.experimentId.title,
           stepTitle: step.title,
-          stepInstruction: step.instruction,
+          stepInstruction: activePrompt,
           stepActionType: step.actionType,
           requiredChemicalCategories: [...new Set(requiredChemicalDocs.map((c) => c.category))],
           level: hintLevel,
         });
       }
     } else {
-      const hint = step.hints.find((h) => h.level === hintLevel) || step.hints[0];
-      hintText = hint?.text || "Think about what you need to do next.";
+      const hints = target.usingMicroSteps ? target.microStep.hints : step.hints;
+      const authored = (hints || []).find((h) => h.level === hintLevel);
+      if (authored) {
+        hintText = authored.text;
+      } else {
+        hintText = await generateTaskHint({
+          experimentTitle: session.experimentId.title,
+          stepTitle: step.title,
+          studentPrompt: activePrompt,
+          expectedIntent: target.usingMicroSteps ? target.microStep.expectedIntent : null,
+          level: hintLevel,
+        });
+      }
     }
 
     // Log hint request
@@ -870,6 +1206,7 @@ const requestHint = async (req, res, next) => {
       userId: req.user._id,
       experimentId: session.experimentId._id,
       stepId,
+      microStepId: gradedMicroStepId,
       actionType: "hint_requested",
       actionDetail: `Hint level ${hintLevel} requested`,
       hintLevel,
@@ -877,15 +1214,79 @@ const requestHint = async (req, res, next) => {
     });
 
     session.behaviorFeatures.totalHintsRequested += 1;
-    const stepEntry = getOrCreateStepProgress(session, stepId);
-    stepEntry.hintsRequested += 1;
-    stepEntry.highestHintLevel = Math.max(stepEntry.highestHintLevel, hintLevel);
-    stepEntry.solvedIndependently = false;
+    const { activeEntry } = resolveActiveProgress(session, stepId, target, gradedMicroStepId);
+    activeEntry.hintsRequested += 1;
+    activeEntry.highestHintLevel = Math.max(activeEntry.highestHintLevel, hintLevel);
+    activeEntry.solvedIndependently = false;
     await session.save();
 
     res.status(200).json({
       success: true,
-      data: { hintLevel, hintText, stepId },
+      data: { hintLevel, hintText, stepId, microStepId: gradedMicroStepId, helpAvailable: hintLevel >= 3 },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/sessions/:id/help
+// Body: { stepId }
+// The one place the correct answer is ever sent to the client — gated server-side (not just in
+// the UI) on the student already having been shown hint level 3 for the current Current Task
+// (or, for an unmigrated step, the step itself), same "backend is the source of truth" principle
+// as evaluateOnBench. Marks the active progress entry's helpUsed so computeStepScore applies the
+// fixed -25% deduction, and logs a help_used Action for analytics.
+const requestHelp = async (req, res, next) => {
+  try {
+    const { stepId } = req.body;
+    const session = await Session.findById(req.params.id).populate("experimentId");
+    if (!session) return res.status(404).json({ success: false, message: "Session not found." });
+
+    const step = session.experimentId.steps.find((s) => s.stepId === stepId);
+    if (!step) return res.status(404).json({ success: false, message: "Step not found." });
+
+    const target = resolveGradingTarget(step, session);
+    const gradedMicroStepId = target.usingMicroSteps ? target.microStep.microStepId : null;
+    const { activeEntry } = resolveActiveProgress(session, stepId, target, gradedMicroStepId);
+    if (activeEntry.highestHintLevel < 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Help is only available after reaching hint level 3 on this task.",
+      });
+    }
+
+    const requiredChemicalDocs = target.chemicals?.length
+      ? await Chemical.find({ _id: { $in: target.chemicals } }).select("name symbol").lean()
+      : [];
+
+    activeEntry.helpUsed = true;
+    activeEntry.solvedIndependently = false;
+    await session.save();
+
+    await Action.create({
+      sessionId: session._id,
+      userId: req.user._id,
+      experimentId: session.experimentId._id,
+      stepId,
+      microStepId: gradedMicroStepId,
+      actionType: "help_used",
+      actionDetail: "Help reveal requested",
+      timeTaken: 0,
+    });
+
+    const explanation = target.usingMicroSteps
+      ? target.microStep.exactAnswer || step.exactAnswer || step.observationGoal || step.expectedAction
+      : step.exactAnswer || step.observationGoal || step.expectedAction;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        stepId,
+        microStepId: gradedMicroStepId,
+        equipment: target.equipment,
+        chemicals: requiredChemicalDocs.map((c) => ({ name: c.name, symbol: c.symbol })),
+        explanation,
+      },
     });
   } catch (error) {
     next(error);
@@ -904,4 +1305,5 @@ module.exports = {
   getUserSessions,
   getSessionStats,
   requestHint,
+  requestHelp,
 };

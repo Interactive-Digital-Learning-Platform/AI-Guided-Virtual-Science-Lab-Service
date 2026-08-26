@@ -18,9 +18,12 @@ const getExperiments = async (req, res, next) => {
 
     const [experiments, total] = await Promise.all([
       Experiment.find(filter)
-        // Exclude fields that would reveal the equipment/chemical selection answers or step
-      
-        .select("-steps.hints -steps.misconceptionRisks -requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction -steps.requiredEquipment")
+        // Exclude fields that would reveal the equipment/chemical selection answers or step/task
+        // answers — steps.microSteps.* mirrors the steps.* exclusions one level down (see
+        // getSession in session.controller.js for the matching set).
+        .select(
+          "-steps.hints -steps.misconceptionRisks -requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction -steps.requiredEquipment -steps.exactAnswer -steps.observationGoal -steps.microSteps.expectedIntent -steps.microSteps.expectedEquipment -steps.microSteps.expectedChemicalsForStep -steps.microSteps.hints -steps.microSteps.exactAnswer -steps.microSteps.expectedMeasurement"
+        )
         .sort({ subject: 1, difficulty: 1 })
         .skip(skip)
         .limit(parseInt(limit))
@@ -66,7 +69,9 @@ const getExperimentInfo = async (req, res, next) => {
 const getExperimentById = async (req, res, next) => {
   try {
     const experiment = await Experiment.findById(req.params.id)
-      .select("-requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction -steps.requiredEquipment")
+      .select(
+        "-requiredEquipment -requiredChemicals -reactionId -steps.requiredChemicalsForStep -steps.expectedAction -steps.requiredEquipment -steps.exactAnswer -steps.observationGoal -steps.microSteps.expectedIntent -steps.microSteps.expectedEquipment -steps.microSteps.expectedChemicalsForStep -steps.microSteps.hints -steps.microSteps.exactAnswer -steps.microSteps.expectedMeasurement"
+      )
       .populate("relatedConcepts", "name description simpleExplanation visualizationAvailable")
       .lean();
 

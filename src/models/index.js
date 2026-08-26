@@ -7,6 +7,7 @@ const Misconception = require("./Misconception");
 const Chemical = require("./Chemical");
 const Reaction = require("./Reaction");
 const LabRun = require("./LabRun");
+const BiologyVisualization = require("./BiologyVisualization");
 
 module.exports = {
   User,
@@ -18,4 +19,5 @@ module.exports = {
   Chemical,
   Reaction,
   LabRun,
+  BiologyVisualization,
 };

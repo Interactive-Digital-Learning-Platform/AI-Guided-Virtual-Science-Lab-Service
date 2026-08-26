@@ -183,7 +183,7 @@ const EQUIPMENT_CATEGORY_BY_ACTION_TYPE = {
 
 /**
  * Step-level equipment hint for the Laboratory Workspace — surfaced automatically the moment the
- * student attempts a step with the wrong (or no) equipment on the bench (see evaluateStepOnBench /
+ * student attempts a step with the wrong (or no) equipment on the bench (see evaluateOnBench /
  * logAction, session.controller.js), and also available on demand from the bulb (requestHint).
  * Never reveals the equipment name, per generateSelectionHint's "no names" principle. Scoped to a
  * single step's requiredEquipment (Experiment.steps[].requiredEquipment) and what's actually on the
@@ -294,12 +294,113 @@ const buildFallbackChemicalHint = ({ level, requiredChemicalCategories }) => {
   return byLevel[level] || byLevel[3];
 };
 
+// Non-revealing category phrase for a Current Task's expectedIntent — used only by the
+// rule-based fallback below, mirrors EQUIPMENT_CATEGORY_BY_ACTION_TYPE's role for
+// generateEquipmentHint.
+const ACTION_CATEGORY_BY_INTENT = {
+  OBSERVE_RESULT: "a change you should be watching for",
+  MEASURE_RESULT: "a value you need to read and record",
+  RECORD_RESULT: "an observation you need to write down",
+  PREPARE_SAMPLE: "getting your materials ready before the main action",
+  HEAT_SAMPLE: "applying heat carefully and purposefully",
+};
+
+/**
+ * Sibling to generateEquipmentHint/generateChemicalHint, for a Current Task whose expectedIntent
+ * has no equipment/chemical gap to hang a hint on (OBSERVE_RESULT, MEASURE_RESULT, RECORD_RESULT,
+ * etc. — the student already has everything they need on the bench, they just need to notice or
+ * record something). Same three-level non-revealing shape and same Gemini-backed-with-fallback
+ * pattern as its two siblings — reuses labHintService's existing groqClient wiring rather than a
+ * second AI integration.
+ */
+const generateTaskHint = async ({ experimentTitle, stepTitle, studentPrompt, expectedIntent, level }) => {
+  const fallback = buildFallbackTaskHint({ level, expectedIntent });
+  if (!isConfigured()) return fallback;
+
+  const prompt = `
+You are a science teacher standing beside a student during a virtual "${experimentTitle}" practical.
+The student is on this step: "${stepTitle}". Their current task: "${studentPrompt}"
+This is hint level ${level} of 3 for this task.
+
+Write ONE short in-character hint (max 25 words) that helps the student figure out what to do,
+WITHOUT ever stating the specific result, reading, or observation they should record.
+- Level 1 (conceptual): ask a reflective question about what they should be paying attention to.
+- Level 2 (functional): describe what kind of change or value they're looking for, still no specifics.
+- Level 3 (direct): point them toward exactly where on the bench to look or what to check — still never state the actual result.
+
+Do not use quotation marks in your answer.
+`;
+
+  try {
+    return await generateText(prompt);
+  } catch (error) {
+    console.error("Groq API error:", error.message);
+    return fallback;
+  }
+};
+
+const buildFallbackTaskHint = ({ level, expectedIntent }) => {
+  const category = ACTION_CATEGORY_BY_INTENT[expectedIntent] || "what this task is asking you to do";
+  const byLevel = {
+    1: `Re-read the current task carefully — what is it actually asking you to notice or do?`,
+    2: `Think about ${category} — take a closer look at your lab bench.`,
+    3: `Look closely at what's currently on your bench and compare it to what you expected — that's ${category}.`,
+  };
+  return byLevel[level] || byLevel[3];
+};
+
+/**
+ * Sibling to generateEquipmentHint, for Electricity (Phase B) PLACE_COMPONENT tasks — surfaced
+ * when a circuit slot is missing a component or filled with the wrong one (see evaluateBoard,
+ * circuitEngine.js). Placement itself is never blocked server-side (see place_component,
+ * labRun.controller.js), so this is the only signal a misplacement gets — same three-level
+ * non-revealing structure as its siblings, and deliberately never names which slot is wrong or
+ * which component belongs there, since that would just hand over the answer through repetition.
+ */
+const generateCircuitHint = async ({ experimentTitle, stepTitle, stepInstruction, level }) => {
+  const fallback = buildFallbackCircuitHint({ level });
+  if (!isConfigured()) return fallback;
+
+  const prompt = `
+You are a physics teacher standing beside a student building a circuit during a virtual "${experimentTitle}" practical.
+The student is on this step: "${stepTitle}" — ${stepInstruction}
+Something about their current circuit isn't right yet — either a position is empty or has the wrong instrument in it.
+This is hint level ${level} of 3 for this task.
+
+Write ONE short in-character hint (max 25 words) that helps the student figure out what's wrong with their circuit,
+WITHOUT ever naming which specific position is wrong or which component belongs there.
+- Level 1 (conceptual): ask what physical quantity they're trying to measure or control at this point in the circuit.
+- Level 2 (functional): ask them to consider the difference between the instruments involved (e.g. what current vs. potential difference each measures, or how series vs. parallel connections behave), without naming a slot.
+- Level 3 (direct): point them toward re-checking how each instrument is connected relative to the rest of the loop — still never name a specific slot or component.
+
+Do not use quotation marks in your answer.
+`;
+
+  try {
+    return await generateText(prompt);
+  } catch (error) {
+    console.error("Groq API error:", error.message);
+    return fallback;
+  }
+};
+
+const buildFallbackCircuitHint = ({ level }) => {
+  const byLevel = {
+    1: "Think about what physical quantity you're trying to measure at this point in the circuit.",
+    2: "Consider whether the instrument here measures current or potential difference — and how that changes where it belongs.",
+    3: "Trace the loop your current would actually follow, and check each instrument's connection against that path.",
+  };
+  return byLevel[level] || byLevel[3];
+};
+
 module.exports = {
   generateSelectionHint,
   generateInterventionHint,
   generateCompoundBuildHint,
   generateEquipmentHint,
   generateChemicalHint,
+  generateTaskHint,
+  generateCircuitHint,
   classifyCompoundBuildMistake,
   hintLevelForAttempts,
 };

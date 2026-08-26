@@ -6,9 +6,13 @@ const actionSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     experimentId: { type: mongoose.Schema.Types.ObjectId, ref: "Experiment", required: true },
     stepId: { type: Number, required: true },
+    // Which Current Task (microStep) within stepId this action targeted — null for steps with no
+    // microSteps defined (unmigrated practicals) or for session-level actions that aren't
+    // step-scoped. See Session.currentMicroStep / logAction in session.controller.js.
+    microStepId: { type: Number, default: null },
     actionType: {
       type: String,
-      enum: ["correct", "incorrect", "skipped", "repeated", "hint_requested", "step_started", "step_completed"],
+      enum: ["correct", "incorrect", "skipped", "repeated", "hint_requested", "help_used", "step_started", "step_completed"],
       required: true,
     },
     actionDetail: { type: String, default: "" }, // what the student did
@@ -29,6 +33,6 @@ const actionSchema = new mongoose.Schema(
   { timestamps: false }
 );
 
-actionSchema.index({ sessionId: 1, stepId: 1 });
+actionSchema.index({ sessionId: 1, stepId: 1, microStepId: 1 });
 
 module.exports = mongoose.model("Action", actionSchema);

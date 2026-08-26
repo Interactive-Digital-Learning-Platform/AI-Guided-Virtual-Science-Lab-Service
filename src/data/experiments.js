@@ -1,46 +1,19 @@
+// Legacy generic experiments (Biology and two early Chemistry practicals) predating the guided
+// equipment/chemical-selection flow — none of these steps carry requiredEquipment/
+// requiredChemicalsForStep, so there isn't enough structure here to safely derive Current Task
+// (microStep) decompositions without guessing at a procedure that isn't actually encoded in this
+// data. They intentionally have no `microSteps` and run on the micro-step engine's whole-step
+// fallback path (see resolveGradingTarget in session.controller.js) — functionally identical to
+// how they behaved before this feature existed. They're also already excluded from the guided
+// catalog (see getExperimentsBySubject's "requiredEquipment.0": {$exists:true} filter). Migrating
+// these to real Current Tasks would require authoring the missing requiredEquipment/
+// requiredChemicalsForStep data first — out of scope here, flagged rather than guessed.
+//
+// The two legacy generic Physics entries that used to live here ("Measuring Density", "Ohm's Law
+// Verification") were removed once physicsPracticals.js added proper guided replacements covering
+// the same subject matter (see seed.js) — keeping both would leave two differently-shaped
+// experiments with the same real-world topic in the database.
 const experiments = [
-  {
-    title: "Measuring Density",
-    subject: "Physics",
-    grades: [7, 8],
-    difficulty: "easy",
-    estimatedTime: 20,
-    description: "Measure the density of a solid object using mass and water displacement.",
-    objectives: ["Measure mass using a balance", "Measure volume by water displacement", "Calculate density"],
-    materials: ["Balance", "Graduated cylinder", "Water", "Solid object", "String"],
-    thumbnailColor: "#4F8EF7",
-    commonMisconceptions: ["PHY_001", "PHY_002"],
-    steps: [
-      { stepId: 1, title: "Zero the Balance", instruction: "Place the balance on a flat surface and zero it.", expectedAction: "zero_balance", actionType: "setup", timeLimit: 60, misconceptionRisks: [], hints: [{ level: 1, text: "Make sure the balance pan is empty first." }, { level: 2, text: "Press the tare/zero button to reset the balance to 0." }, { level: 3, text: "The balance reading should show 0.00g before you place anything on it." }] },
-      { stepId: 2, title: "Measure Mass", instruction: "Place the object on the balance and record its mass in grams.", expectedAction: "record_mass", actionType: "measure", timeLimit: 60, misconceptionRisks: ["PHY_001"], hints: [{ level: 1, text: "Place the object carefully on the balance pan." }, { level: 2, text: "Wait for the reading to stabilize, then record it." }, { level: 3, text: "Write down the mass value in grams (e.g., 45.6 g)." }] },
-      { stepId: 3, title: "Fill Cylinder", instruction: "Fill the graduated cylinder with water to the 50 ml mark.", expectedAction: "fill_cylinder", actionType: "add", timeLimit: 90, misconceptionRisks: [], hints: [{ level: 1, text: "Use a beaker to pour water slowly." }, { level: 2, text: "Read the water level at the bottom of the meniscus." }, { level: 3, text: "The water should be exactly at the 50 ml line." }] },
-      { stepId: 4, title: "Record Initial Level", instruction: "Record the initial water level (50 ml).", expectedAction: "record_initial_volume", actionType: "record", timeLimit: 30, misconceptionRisks: [], hints: [{ level: 1, text: "This is your starting volume before adding the object." }, { level: 2, text: "Write down 50 ml as your initial volume." }, { level: 3, text: "You need this value to calculate volume by displacement." }] },
-      { stepId: 5, title: "Submerge Object", instruction: "Carefully lower the object into the cylinder using a string.", expectedAction: "submerge_object", actionType: "add", timeLimit: 60, misconceptionRisks: ["PHY_002"], hints: [{ level: 1, text: "Use the string to lower the object gently." }, { level: 2, text: "Make sure the object is fully underwater." }, { level: 3, text: "Do not splash — you need an accurate new reading." }] },
-      { stepId: 6, title: "Record Final Level", instruction: "Record the new water level after submerging the object.", expectedAction: "record_final_volume", actionType: "record", timeLimit: 30, misconceptionRisks: [], hints: [{ level: 1, text: "Read the new water level at the bottom of the meniscus." }, { level: 2, text: "This should be higher than 50 ml." }, { level: 3, text: "The difference (final - 50) equals the object's volume." }] },
-      { stepId: 7, title: "Calculate Density", instruction: "Calculate: Volume = Final - Initial. Then Density = Mass ÷ Volume.", expectedAction: "calculate_density", actionType: "calculate", timeLimit: 120, misconceptionRisks: ["PHY_001"], hints: [{ level: 1, text: "Volume of object = final water level - initial water level." }, { level: 2, text: "Density = Mass (g) ÷ Volume (ml). Units are g/ml." }, { level: 3, text: "Example: if mass=45g and volume=15ml, density = 45÷15 = 3 g/ml." }] },
-    ],
-  },
-  {
-    title: "Ohm's Law Verification",
-    subject: "Physics",
-    grades: [9, 10],
-    difficulty: "medium",
-    estimatedTime: 30,
-    description: "Verify Ohm's Law by measuring current and voltage across a resistor.",
-    objectives: ["Connect a simple circuit", "Measure voltage and current", "Calculate resistance", "Plot V-I graph"],
-    materials: ["Battery pack", "Resistor", "Ammeter", "Voltmeter", "Connecting wires", "Switch"],
-    thumbnailColor: "#F7A94F",
-    commonMisconceptions: ["PHY_003", "PHY_004"],
-    steps: [
-      { stepId: 1, title: "Connect Series Circuit", instruction: "Connect battery, switch, ammeter, and resistor in series.", expectedAction: "connect_series", actionType: "setup", timeLimit: 120, misconceptionRisks: ["PHY_003"], hints: [{ level: 1, text: "Series means all components are in one loop." }, { level: 2, text: "Connect: Battery(+) → Switch → Ammeter → Resistor → Battery(-)." }, { level: 3, text: "Ammeter must be in series so the current flows through it." }] },
-      { stepId: 2, title: "Connect Voltmeter", instruction: "Connect the voltmeter in parallel across the resistor.", expectedAction: "connect_voltmeter", actionType: "setup", timeLimit: 90, misconceptionRisks: ["PHY_004"], hints: [{ level: 1, text: "Voltmeter goes across (parallel to) the component being measured." }, { level: 2, text: "Connect one voltmeter terminal to each side of the resistor." }, { level: 3, text: "Voltmeter in parallel, Ammeter in series — remember this rule!" }] },
-      { stepId: 3, title: "Record Voltage", instruction: "Close the switch and record the voltmeter reading (V).", expectedAction: "record_voltage", actionType: "record", timeLimit: 60, misconceptionRisks: ["PHY_004"], hints: [{ level: 1, text: "Close the switch to complete the circuit." }, { level: 2, text: "Read the voltmeter scale carefully. Record in Volts (V)." }, { level: 3, text: "If the needle deflects wrongly, swap the voltmeter terminals." }] },
-      { stepId: 4, title: "Record Current", instruction: "Record the ammeter reading (I) in Amperes.", expectedAction: "record_current", actionType: "record", timeLimit: 60, misconceptionRisks: ["PHY_003"], hints: [{ level: 1, text: "Read the ammeter scale. Record in Amperes (A) or mA." }, { level: 2, text: "The current should be the same before and after the resistor." }, { level: 3, text: "If reading is too high, use the higher range on the ammeter." }] },
-      { stepId: 5, title: "Calculate Resistance", instruction: "Calculate R = V ÷ I. Record the resistance in Ohms.", expectedAction: "calculate_resistance", actionType: "calculate", timeLimit: 90, misconceptionRisks: ["PHY_004"], hints: [{ level: 1, text: "Ohm's Law: V = IR, so R = V ÷ I." }, { level: 2, text: "Divide your voltage reading by your current reading." }, { level: 3, text: "Units: Volts ÷ Amperes = Ohms (Ω)." }] },
-      { stepId: 6, title: "Repeat with Different Voltage", instruction: "Change battery setting, repeat steps 3-5 for 3 different voltages.", expectedAction: "repeat_measurements", actionType: "measure", timeLimit: 180, misconceptionRisks: [], hints: [{ level: 1, text: "Record at least 3 different V and I pairs." }, { level: 2, text: "Change the number of batteries or use a variable resistor." }, { level: 3, text: "You need multiple data points to plot a V-I graph." }] },
-      { stepId: 7, title: "Plot V-I Graph", instruction: "Plot Voltage (y-axis) vs Current (x-axis). Draw best-fit line.", expectedAction: "plot_graph", actionType: "record", timeLimit: 120, misconceptionRisks: [], hints: [{ level: 1, text: "Label axes: y = Voltage (V), x = Current (A)." }, { level: 2, text: "Plot each V-I pair as a point on the graph." }, { level: 3, text: "The slope of the best-fit line = resistance R." }] },
-    ],
-  },
   {
     title: "Acid-Base Titration",
     subject: "Chemistry",

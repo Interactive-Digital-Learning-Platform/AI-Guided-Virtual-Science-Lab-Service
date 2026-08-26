@@ -5,6 +5,9 @@ const { findReaction, serializeReactionMatch } = require("../services/reactionEn
 const { generateTutorResponse } = require("../services/labTutorService");
 const { generateInterventionHint } = require("../services/labHintService");
 const { computeContainerPh } = require("../services/phService");
+const { computePendulumPeriod, computeSpringConstant } = require("../services/mechanicsEngine");
+const { computeMeterReading } = require("../services/circuitEngine");
+const { circuitBoards, CIRCUIT_EQUIPMENT_ROLES } = require("../data/circuitBoards");
 const FREEFORM_EXPERIMENT_TITLE = "this virtual lab"; // no Experiment/Session title to reference outside a guided practical
 
 const MAX_TUTOR_HISTORY = 6; // turns kept in the doc; only the last few are sent as prompt context
@@ -59,7 +62,12 @@ const checkSafetyIntervention = async ({ actionType, instance, reactionResult, e
     return { type: "heating_empty_container", hint };
   }
 
-  if (actionType === "add_chemical" && reactionResult && !reactionResult.found && reactionResult.reason === "no_known_reaction") {
+  if (
+    (actionType === "add_chemical" || actionType === "pour") &&
+    reactionResult &&
+    !reactionResult.found &&
+    reactionResult.reason === "no_known_reaction"
+  ) {
     const hint = await generateInterventionHint({
       triggerType: "unknown_combination",
       experimentTitle,
@@ -115,16 +123,42 @@ const getLabRun = async (req, res, next) => {
 //   move_equipment:   { instanceId, position }
 //   remove_equipment: { instanceId }
 //   add_chemical:     { instanceId, chemicalId, quantity?, unit? }  — unit "g" -> mass, else volume
+//   pour:             { instanceId, targetInstanceId }  — moves all of instanceId's contents into
+//                        targetInstanceId and empties instanceId; re-checks the target for a reaction
 //   reset:            { instanceId }
 //   heat:             { instanceId, heated?, temperature? }
 //   probe_measure:    { instanceId, targetInstanceId }  — instanceId is the probe (e.g. pH meter)
 //   probe_detach:     { instanceId }
+//   attach_mass:      { instanceId, quantity }  — mass in grams (spring/pendulum overload, or a
+//                        balance reading — physics-only, see mechanicsEngine.js)
+//   set_pendulum_length / set_length: { instanceId, quantity }  — string/natural length in cm
+//   set_release_angle:   { instanceId, quantity }  — release angle in degrees
+//   start_timer / stop_timer / record_oscillation: { instanceId }  — instanceId is the stopwatch;
+//     stop_timer looks up any pendulum_bob instance on the bench for its length and computes g
+//   read_measurement: { instanceId, quantity, unit?, phase? }  — generic apparatus reading
+//     (measuring_cylinder needs phase: "initial"|"final"; spring computes spring constant)
 // Equipment instances are keyed by a client-generated instanceId (e.g. "beaker-<timestamp>"), not
-// equipmentType, so a student can place multiple beakers on the bench at once.
+// equipmentType, so a student can place multiple beakers on the bench at once. Physics-only
+// action types (above) operate on labRun.physicsEquipment, a parallel array to labRun.equipment —
+// see physicsInstanceSchema in LabRun.js for why they don't share a bench-state shape.
 const logLabAction = async (req, res, next) => {
   try {
-    const { actionType, instanceId, equipmentType, position, chemicalId, quantity, unit, temperature, heated, targetInstanceId } =
-      req.body;
+    const {
+      actionType,
+      instanceId,
+      equipmentType,
+      position,
+      chemicalId,
+      quantity,
+      unit,
+      temperature,
+      heated,
+      targetInstanceId,
+      category, // "physics" routes create_equipment into labRun.physicsEquipment; omitted/"chemistry" is unchanged default behavior
+      phase, // "initial" | "final" — measuring_cylinder read_measurement only
+      slotId, // place_component only
+      boardId, // place_component only — which circuitBoards.js layout is active for this bench right now
+    } = req.body;
     if (!actionType) return res.status(400).json({ success: false, message: "actionType is required." });
 
     const labRun = await LabRun.findOne({ _id: req.params.id, userId: req.user._id });
@@ -133,7 +167,8 @@ const logLabAction = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Lab run is not active." });
 
     const instance = instanceId ? labRun.equipment.find((e) => e.instanceId === instanceId) : null;
-    let actionEquipmentLabel = instance?.equipmentType || equipmentType || null;
+    const physicsInstance = instanceId ? labRun.physicsEquipment.find((e) => e.instanceId === instanceId) : null;
+    let actionEquipmentLabel = instance?.equipmentType || physicsInstance?.equipmentType || equipmentType || null;
     let reactionResult = null;
     let intervention = null;
     // probe_measure can't know its result (the measured value) until the switch below runs, unlike
@@ -147,31 +182,45 @@ const logLabAction = async (req, res, next) => {
         if (!instanceId || !equipmentType) {
           return res.status(400).json({ success: false, message: "instanceId and equipmentType are required." });
         }
-        if (instance) {
+        if (instance || physicsInstance) {
           return res.status(400).json({ success: false, message: "An equipment instance with this id already exists." });
         }
-        labRun.equipment.push({
-          instanceId,
-          equipmentType,
-          position: position || { x: 0, y: 0 },
-          contents: [],
-          temperature: 25,
-          isHeated: false,
-        });
+        if (category === "physics") {
+          labRun.physicsEquipment.push({
+            instanceId,
+            equipmentType,
+            position: position || { x: 0, y: 0 },
+            // Circuit components (resistor/ammeter/voltmeter) get their role set immediately so
+            // place_component can validate slot compatibility — mechanics equipment (pendulum,
+            // stopwatch, etc.) has no entry in CIRCUIT_EQUIPMENT_ROLES and stays role: null.
+            role: CIRCUIT_EQUIPMENT_ROLES[equipmentType] || null,
+          });
+        } else {
+          labRun.equipment.push({
+            instanceId,
+            equipmentType,
+            position: position || { x: 0, y: 0 },
+            contents: [],
+            temperature: 25,
+            isHeated: false,
+          });
+        }
         actionEquipmentLabel = equipmentType;
         break;
       }
 
       case "move_equipment": {
-        if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        const moveTarget = instance || physicsInstance;
+        if (!moveTarget) return res.status(404).json({ success: false, message: "Equipment instance not found." });
         if (!position) return res.status(400).json({ success: false, message: "position is required." });
-        instance.position = position;
+        moveTarget.position = position;
         break;
       }
 
       case "remove_equipment": {
-        if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
-        labRun.equipment = labRun.equipment.filter((e) => e.instanceId !== instanceId);
+        if (!instance && !physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (instance) labRun.equipment = labRun.equipment.filter((e) => e.instanceId !== instanceId);
+        if (physicsInstance) labRun.physicsEquipment = labRun.physicsEquipment.filter((e) => e.instanceId !== instanceId);
         break;
       }
 
@@ -187,6 +236,31 @@ const logLabAction = async (req, res, next) => {
         intervention = await checkSafetyIntervention({
           actionType,
           instance,
+          reactionResult,
+          experimentTitle: FREEFORM_EXPERIMENT_TITLE,
+        });
+        break;
+      }
+
+      case "pour": {
+        if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (!targetInstanceId) return res.status(400).json({ success: false, message: "targetInstanceId is required." });
+        if (targetInstanceId === instanceId) {
+          return res.status(400).json({ success: false, message: "Cannot pour a container into itself." });
+        }
+        const pourTarget = labRun.equipment.find((e) => e.instanceId === targetInstanceId);
+        if (!pourTarget) return res.status(404).json({ success: false, message: "Target equipment not found." });
+        if (instance.contents.length === 0) {
+          return res.status(400).json({ success: false, message: "Nothing to pour — this container is empty." });
+        }
+
+        pourTarget.contents.push(...instance.contents);
+        instance.contents = [];
+
+        reactionResult = await checkAndApplyReaction(labRun, pourTarget);
+        intervention = await checkSafetyIntervention({
+          actionType,
+          instance: pourTarget,
           reactionResult,
           experimentTitle: FREEFORM_EXPERIMENT_TITLE,
         });
@@ -239,6 +313,195 @@ const logLabAction = async (req, res, next) => {
         if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
         instance.probeTargetId = null;
         instance.lastMeasurement = null;
+        break;
+      }
+
+      case "attach_mass": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (quantity == null) return res.status(400).json({ success: false, message: "quantity (mass in grams) is required." });
+        physicsInstance.attachedMass = { value: quantity, unit: "g" };
+        resultQuantity = quantity;
+        resultUnit = "g";
+        break;
+      }
+
+      case "set_pendulum_length":
+      case "set_length": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (quantity == null) return res.status(400).json({ success: false, message: "quantity (length in cm) is required." });
+        physicsInstance.length = { value: quantity, unit: "cm" };
+        resultQuantity = quantity;
+        resultUnit = "cm";
+        break;
+      }
+
+      case "set_release_angle": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (quantity == null) return res.status(400).json({ success: false, message: "quantity (angle in degrees) is required." });
+        physicsInstance.angle = { value: quantity, unit: "deg" };
+        resultQuantity = quantity;
+        resultUnit = "deg";
+        break;
+      }
+
+      case "start_timer": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        physicsInstance.timerState = { running: true, startedAt: new Date(), elapsedSeconds: 0, oscillationCount: 0 };
+        break;
+      }
+
+      case "record_oscillation": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (!physicsInstance.timerState?.running) {
+          return res.status(400).json({ success: false, message: "Timer is not running." });
+        }
+        physicsInstance.timerState.oscillationCount += 1;
+        resultQuantity = physicsInstance.timerState.oscillationCount;
+        resultUnit = "oscillations";
+        break;
+      }
+
+      case "stop_timer": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (!physicsInstance.timerState?.running) {
+          return res.status(400).json({ success: false, message: "Timer is not running." });
+        }
+        const elapsedSeconds = (Date.now() - new Date(physicsInstance.timerState.startedAt).getTime()) / 1000;
+        physicsInstance.timerState.running = false;
+        physicsInstance.timerState.elapsedSeconds = elapsedSeconds;
+
+        // Find the pendulum on the bench for its string length — a guided practical only ever
+        // has one apparatus active at a time, so this doesn't need a client-supplied link.
+        const pendulum = labRun.physicsEquipment.find((e) => e.equipmentType === "pendulum_bob");
+        if (pendulum?.length?.value) {
+          const periodResult = computePendulumPeriod({
+            length_cm: pendulum.length.value,
+            oscillationCount: physicsInstance.timerState.oscillationCount,
+            elapsedSeconds,
+          });
+          if (periodResult.measurable) {
+            physicsInstance.lastMeasurement = {
+              measurementType: "g",
+              value: periodResult.value,
+              targetId: pendulum.instanceId,
+              measuredAt: new Date(),
+            };
+            resultQuantity = periodResult.value;
+            resultUnit = "m/s^2";
+          }
+        }
+        break;
+      }
+
+      case "read_measurement": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (quantity == null) return res.status(400).json({ success: false, message: "quantity is required." });
+
+        if (physicsInstance.equipmentType === "measuring_cylinder") {
+          if (phase !== "initial" && phase !== "final") {
+            return res
+              .status(400)
+              .json({ success: false, message: "phase ('initial' or 'final') is required for a measuring cylinder reading." });
+          }
+          if (phase === "initial") physicsInstance.measuredVolumeDisplacement.initial = quantity;
+          else physicsInstance.measuredVolumeDisplacement.final = quantity;
+          resultQuantity = quantity;
+          resultUnit = "mL";
+        } else if (physicsInstance.equipmentType === "spring") {
+          const naturalLength = physicsInstance.length?.value;
+          if (naturalLength == null) {
+            return res.status(400).json({ success: false, message: "Spring's natural length hasn't been set yet." });
+          }
+          physicsInstance.extension = { value: quantity - naturalLength, unit: "cm" };
+          const springResult = computeSpringConstant({
+            naturalLength_cm: naturalLength,
+            extendedLength_cm: quantity,
+            mass_g: physicsInstance.attachedMass?.value,
+          });
+          if (springResult.measurable) {
+            physicsInstance.lastMeasurement = {
+              measurementType: "spring_constant",
+              value: springResult.value,
+              targetId: physicsInstance.instanceId,
+              measuredAt: new Date(),
+            };
+          }
+          resultQuantity = quantity;
+          resultUnit = "cm";
+        } else {
+          // Generic reading (e.g. a balance recording an object's mass) — stored as attachedMass
+          // so mechanicsEngine.resolvePhysicsMeasurement picks it up the same way an explicitly
+          // attached mass would be (see the density practical's mass step).
+          physicsInstance.attachedMass = { value: quantity, unit: unit || "g" };
+          resultQuantity = quantity;
+          resultUnit = unit || "g";
+        }
+        break;
+      }
+
+      case "place_component": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (!slotId || !boardId) return res.status(400).json({ success: false, message: "slotId and boardId are required." });
+        const board = circuitBoards[boardId];
+        if (!board) return res.status(400).json({ success: false, message: `Unknown circuit board: ${boardId}` });
+        const slot = board.slots.find((s) => s.slotId === slotId);
+        if (!slot) return res.status(400).json({ success: false, message: `Unknown slot "${slotId}" on board "${boardId}".` });
+
+        // Deliberately NOT rejected for role mismatch — a student can drop any component into any
+        // slot. Whether it belongs there is evaluated afterward (see evaluateBoard/
+        // computeMeterReading), not gatekept here; blocking the drop would just hand the student
+        // the answer via trial and error instead of letting them reason about the circuit.
+
+        // A step-scoped board change (e.g. moving from the series board to the parallel board in
+        // the same practical) starts filledSlots over — the previous board's placements don't
+        // carry across to a different layout.
+        if (!labRun.circuitBoardState || labRun.circuitBoardState.boardId !== boardId) {
+          labRun.circuitBoardState = { boardId, filledSlots: [] };
+        }
+        labRun.circuitBoardState.filledSlots = labRun.circuitBoardState.filledSlots.filter(
+          (f) => f.slotId !== slotId && f.instanceId !== instanceId
+        );
+        labRun.circuitBoardState.filledSlots.push({ slotId, instanceId });
+        physicsInstance.slotId = slotId;
+        break;
+      }
+
+      case "remove_component": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (labRun.circuitBoardState) {
+          labRun.circuitBoardState.filledSlots = labRun.circuitBoardState.filledSlots.filter((f) => f.instanceId !== instanceId);
+        }
+        physicsInstance.slotId = null;
+        break;
+      }
+
+      case "set_component_value": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (quantity == null) return res.status(400).json({ success: false, message: "quantity (resistance in ohms) is required." });
+        physicsInstance.resistanceValue = quantity;
+        resultQuantity = quantity;
+        resultUnit = "Ω";
+        break;
+      }
+
+      case "read_meter": {
+        if (!physicsInstance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (!labRun.circuitBoardState?.boardId) {
+          return res.status(400).json({ success: false, message: "No circuit board is active on this bench yet." });
+        }
+
+        // Not-measurable (no reading, never a wrong-but-plausible number) if this instrument
+        // isn't correctly placed for what it is — see computeMeterReading's reasoning.
+        const reading = computeMeterReading({
+          boardId: labRun.circuitBoardState.boardId,
+          instance: physicsInstance,
+          physicsEquipment: labRun.physicsEquipment,
+        });
+        physicsInstance.lastMeasurement = reading.measurable
+          ? { measurementType: reading.metric, value: reading.value, targetId: null, measuredAt: new Date() }
+          : { measurementType: null, value: null, targetId: null, measuredAt: new Date() };
+        resultQuantity = reading.measurable ? reading.value : null;
+        resultUnit = reading.measurable ? reading.unit : null;
         break;
       }
 

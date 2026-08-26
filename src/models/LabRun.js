@@ -19,6 +19,20 @@ const actionSchema = new mongoose.Schema(
         "reset",
         "probe_measure",
         "probe_detach",
+        // Mechanics (Phase A physics) — see mechanicsEngine.js.
+        "attach_mass",
+        "set_pendulum_length",
+        "set_length", // generic alias of set_pendulum_length — e.g. a spring's natural length
+        "set_release_angle",
+        "start_timer",
+        "stop_timer",
+        "record_oscillation",
+        "read_measurement",
+        // Electricity (Phase B) — see circuitEngine.js.
+        "place_component",
+        "remove_component",
+        "set_component_value",
+        "read_meter",
       ],
       required: true,
     },
@@ -77,6 +91,50 @@ const equipmentInstanceSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Physics-only sibling of equipmentInstanceSchema. A chemistry-shaped container instance
+// (contents/temperature/isHeated) has no meaningful equivalent for a pendulum, spring, or circuit
+// component, so physics bench state gets its own array (labRunSchema.physicsEquipment) rather than
+// overloading equipmentInstanceSchema — every existing consumer of labRun.equipment (mobile
+// EquipmentInstanceType, LabWorkspace.tsx, checkAndApplyReaction, evaluateOnBench) is left
+// completely untouched; a chemistry LabRun simply never populates physicsEquipment.
+const physicsInstanceSchema = new mongoose.Schema(
+  {
+    instanceId: { type: String, required: true },
+    equipmentType: { type: String, required: true },
+    position: {
+      x: { type: Number, default: 0 },
+      y: { type: Number, default: 0 },
+    },
+    // Mechanics (Phase A)
+    attachedMass: { value: { type: Number, default: null }, unit: { type: String, default: "g" } },
+    length: { value: { type: Number, default: null }, unit: { type: String, default: "cm" } },
+    angle: { value: { type: Number, default: null }, unit: { type: String, default: "deg" } },
+    extension: { value: { type: Number, default: null }, unit: { type: String, default: "cm" } },
+    timerState: {
+      running: { type: Boolean, default: false },
+      startedAt: { type: Date, default: null },
+      elapsedSeconds: { type: Number, default: 0 },
+      oscillationCount: { type: Number, default: 0 },
+    },
+    measuredVolumeDisplacement: {
+      initial: { type: Number, default: null },
+      final: { type: Number, default: null },
+    },
+    // Electricity (Phase B) — unused by mechanics instances.
+    slotId: { type: String, default: null },
+    resistanceValue: { type: Number, default: null },
+    role: { type: String, enum: ["resistor", "ammeter", "voltmeter", "battery", "wire_link", null], default: null },
+    lastMeasurement: {
+      // "period" | "spring_constant" | "density" | "resistance" | "current" | "voltage"
+      measurementType: { type: String, default: null },
+      value: { type: Number, default: null },
+      targetId: { type: String, default: null },
+      measuredAt: { type: Date, default: null },
+    },
+  },
+  { _id: false }
+);
+
 const labRunSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
@@ -87,6 +145,17 @@ const labRunSchema = new mongoose.Schema(
     startedAt: { type: Date, default: Date.now },
     endedAt: { type: Date, default: null },
     equipment: [equipmentInstanceSchema],
+    // Physics bench state, parallel to `equipment` — see physicsInstanceSchema above. A given
+    // LabRun populates one or the other depending on the practical's subject, never both.
+    physicsEquipment: [physicsInstanceSchema],
+    // Electricity (Phase B) only: which slot board is currently active and what's placed where —
+    // set/reset by the first place_component call for a given boardId (see labRun.controller.js).
+    // A practical whose steps use different boards (e.g. series then parallel) resets filledSlots
+    // when the boardId changes, since the previous board's placements don't carry over.
+    circuitBoardState: {
+      boardId: { type: String, default: null },
+      filledSlots: [{ slotId: { type: String }, instanceId: { type: String } }],
+    },
     actions: [actionSchema],
     reactionsTriggered: [{ type: mongoose.Schema.Types.ObjectId, ref: "Reaction" }],
     tutorConversation: [tutorTurnSchema],
