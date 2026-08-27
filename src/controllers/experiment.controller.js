@@ -93,12 +93,12 @@ const getExperimentById = async (req, res, next) => {
 const getExperimentsBySubject = async (req, res, next) => {
   try {
     const { subject } = req.params;
-    const userGrade = req.user.grade;
 
+    // Not grade-filtered — this app targets Grade 10/11 students exclusively, so there's no
+    // narrower audience to gate content against.
     const experiments = await Experiment.find({
       subject,
       isActive: true,
-      grades: userGrade,
       // Excludes legacy/generic experiments (e.g. "Acid-Base Titration", "Separating Mixtures by
       // Filtration" in data/experiments.js) that predate the equipment/chemical-selection guided
       // flow and were never given a requiredEquipment list — without this, a student could open

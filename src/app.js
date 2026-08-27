@@ -14,6 +14,7 @@ const sessionRoutes = require("./routes/session.routes");
 const feedbackRoutes = require("./routes/feedback.routes");
 const analyticsRoutes = require("./routes/analytics.routes");
 const chemicalRoutes = require("./routes/chemical.routes");
+const mediaRoutes = require("./routes/media.routes");
 const labRoutes = require("./routes/lab.routes");
 const biologyRoutes = require("./routes/biology.routes");
 
@@ -67,6 +68,7 @@ app.use("/api/sessions", sessionRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/chemicals", chemicalRoutes);
+app.use("/api/media", mediaRoutes);
 app.use("/api/lab", labRoutes);
 app.use("/api/biology", biologyRoutes);
 

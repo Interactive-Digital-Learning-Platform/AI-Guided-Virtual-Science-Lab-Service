@@ -39,6 +39,20 @@ const chemicalSchema = new mongoose.Schema(
     hazardInfo: [{ type: String }],
     commonUses: [{ type: String }],
     iconKey: { type: String, default: null }, // maps to a mobile-side sprite/asset key
+    // Remote illustration for this element/compound. Storage-agnostic reference only — never the
+    // binary itself. `provider` decides how mediaService turns it into a public URL:
+    //   "minio"     -> streamed through GET /api/media/chemicals/:id (object lives in `key`)
+    //   "s3"/"cloudinary" -> `url` is a ready public/CDN URL, served to the client as-is
+    // The mobile app only ever receives the resolved `imageUrl` string (see chemical.controller),
+    // so moving the binary to S3/Cloudinary later is a backend-only change.
+    artwork: {
+      provider: { type: String, enum: ["minio", "s3", "cloudinary", null], default: null },
+      key: { type: String, default: null }, // object key within the media bucket (minio/s3)
+      url: { type: String, default: null }, // absolute CDN/public URL (s3 public / cloudinary)
+      altText: { type: String, default: null },
+      width: { type: Number, default: null },
+      height: { type: Number, default: null },
+    },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
