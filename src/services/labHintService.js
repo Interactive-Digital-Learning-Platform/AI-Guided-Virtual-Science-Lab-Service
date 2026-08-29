@@ -92,6 +92,8 @@ const buildFallbackIntervention = (triggerType, context) => {
       return `I noticed this step has been attempted ${context?.attempts || "several"} times. Let's review the concept behind this process.`;
     case "rushed_step":
       return "That happened quickly — take a moment to observe what changed before moving on.";
+    case "transfer_contamination":
+      return `Using the same ${context?.instrument || "transfer tool"} in two different solutions can carry traces of the first into the second — think about whether that matters here.`;
     default:
       return "Pause for a moment and consider what you expect to happen next.";
   }
@@ -255,10 +257,24 @@ const generateChemicalHint = async ({
   stepInstruction,
   stepActionType,
   requiredChemicalCategories,
+  // Non-blocking selection: false → the needed substance isn't in the student's lab at all, so
+  // the hint should steer them toward the in-workspace Material Library ("+ Add Materials")
+  // rather than toward their bench — still without ever naming the substance. Defaults true so
+  // legacy callers / un-seeded runs behave exactly as before.
+  materialAvailable = true,
   level,
 }) => {
-  const fallback = buildFallbackChemicalHint({ level, requiredChemicalCategories });
+  const fallback = buildFallbackChemicalHint({ level, requiredChemicalCategories, materialAvailable });
   if (!isConfigured()) return fallback;
+
+  const levelGuidance = materialAvailable
+    ? `- Level 2 (functional): describe what the chemical should DO in this reaction/test, still no name or formula.
+- Level 3 (direct): point them toward checking their materials for a substance with that property — still never name it.`
+    : `IMPORTANT: the student does NOT currently have any suitable substance available in their lab, so
+they need to bring one in from the in-workspace Material Library ("+ Add Materials") — the hint must
+make that recovery path discoverable without ever naming the substance.
+- Level 2 (functional): tell them they may need to bring another material into their lab and to open the Material Library, and describe (abstractly) what the substance should DO — no name or formula.
+- Level 3 (direct): tell them to look in the Material Library for a substance with the relevant property (e.g. one that shows whether a solution is acidic, basic or neutral) and add it to their lab — still never name it.`;
 
   const prompt = `
 You are a science teacher standing beside a student during a virtual "${experimentTitle}" practical.
@@ -266,11 +282,10 @@ The student is on this step: "${stepTitle}" — ${stepInstruction}
 They have not yet added the right chemical(s) for this step. The general category involved: ${requiredChemicalCategories.join(", ") || "a specific substance"}.
 This is hint level ${level} of 3 for this step.
 
-Write ONE short in-character hint (max 25 words) that helps the student figure out which chemical(s)
+Write ONE short in-character hint (max 30 words) that helps the student figure out which chemical(s)
 this step needs, WITHOUT ever naming the specific chemical, its formula, or its symbol.
 - Level 1 (conceptual): ask about the chemical property or role needed (e.g. acidic vs alkaline) — stay abstract.
-- Level 2 (functional): describe what the chemical should DO in this reaction/test, still no name or formula.
-- Level 3 (direct): point them toward checking their materials for a substance with that property — still never name it.
+${levelGuidance}
 
 Do not use quotation marks.
 `;
@@ -283,7 +298,19 @@ Do not use quotation marks.
   }
 };
 
-const buildFallbackChemicalHint = ({ level, requiredChemicalCategories }) => {
+const buildFallbackChemicalHint = ({ level, requiredChemicalCategories, materialAvailable = true }) => {
+  if (!materialAvailable) {
+    // The needed substance isn't in the student's lab — steer toward the Material Library, never
+    // naming it (only the server-gated Help reveal may do that). Mirrors spec §12's ladder.
+    const byLevel = {
+      1: "Think about whether the materials currently in your lab are enough to complete this task.",
+      2: "You may need to bring another material into the lab — open the Material Library and think about what kind of substance would help you here.",
+      // Concept-oriented, still never names the substance or its exact class — the student maps
+      // "the property this task needs" to a material in the Library themselves.
+      3: "Look in the Material Library for a material with the property this task depends on, and add it to your lab.",
+    };
+    return byLevel[level] || byLevel[3];
+  }
   const byLevel = {
     1: "What kind of solution does this step call for — think about the property being tested or produced.",
     2: "Consider which of your materials would actually cause the change this step describes.",

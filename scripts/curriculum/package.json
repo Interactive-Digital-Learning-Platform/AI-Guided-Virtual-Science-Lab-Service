@@ -1,0 +1,16 @@
+{
+  "name": "curriculum-refs-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline job: lab service <-> curriculum knowledge base (Qdrant). Builds Experiment.curriculumRefs. Isolated node_modules so the ML/embedding deps never touch the main service runtime.",
+  "type": "commonjs",
+  "scripts": {
+    "sync": "node syncCurriculumRefs.js"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@qdrant/js-client-rest": "^1.19.0",
+    "dotenv": "^16.4.5",
+    "mongodb": "^6.9.0"
+  }
+}

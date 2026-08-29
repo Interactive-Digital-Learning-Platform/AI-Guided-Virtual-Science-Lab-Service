@@ -9,11 +9,38 @@ const misconceptionsData = require("./misconceptions");
 const experimentsData = require("./experiments");
 const chemicalsData = require("./chemicals");
 const reactionsData = require("./reactions");
+const { withAppearance } = require("./chemicalAppearance");
 const chemistryPracticalsData = require("./chemistryPracticals");
 const physicsPracticalsData = require("./physicsPracticals");
 const biologyVisualizationsData = require("./biologyVisualizations");
 const BiologyVisualization = require("../models/BiologyVisualization");
 const { buildReactantKey } = require("../services/reactionEngine");
+
+// Precomputed textbook lesson/page map (npm run curriculum:sync — see scripts/curriculum/). Optional
+// — absent until the sync job has run. Re-seeding wipes Experiment.curriculumRefs, so this file is
+// the durable copy that survives a re-seed; the sync job can also be re-run against a fresh DB.
+let curriculumRefsMap = {};
+try {
+  curriculumRefsMap = require("./curriculum/curriculumRefs.generated.json");
+  console.log(`📖 Loaded curriculum refs for ${Object.keys(curriculumRefsMap).length} practical(s)`);
+} catch {
+  console.log("📖 No curriculum refs file (npm run curriculum:sync not run yet) — skipping");
+}
+
+// Attaches curriculumRefs (experiment- and step-level) to a resolved practical, by title.
+const withCurriculumRefs = (practical) => {
+  const entry = curriculumRefsMap[practical.title];
+  if (!entry) return practical;
+  return {
+    ...practical,
+    curriculumRefs: entry.experimentRefs || [],
+    curriculumRefsGeneratedAt: entry.generatedAt ? new Date(entry.generatedAt) : new Date(),
+    steps: (practical.steps || []).map((step) => ({
+      ...step,
+      curriculumRefs: (entry.steps && entry.steps[String(step.stepId)]) || [],
+    })),
+  };
+};
 
 const seed = async () => {
   try {
@@ -55,7 +82,9 @@ const seed = async () => {
     concepts.forEach((c) => { conceptMap[c.name] = c._id; });
 
     // Seed Chemicals (needed before experiments/reactions, which reference them)
-    const chemicals = await Chemical.insertMany(chemicalsData);
+    // Materialise each chemical's lab appearance (chemicalAppearance.js) onto the doc, so
+    // GET /api/chemicals ships it and the observable-state engine can read it server-side.
+    const chemicals = await Chemical.insertMany(withAppearance(chemicalsData));
     console.log(`✅ Seeded ${chemicals.length} chemicals`);
 
     const chemicalMap = {};
@@ -176,11 +205,13 @@ const seed = async () => {
       };
     });
 
-    const experiments = await Experiment.insertMany([
-      ...genericExperimentsToInsert,
-      ...chemistryPracticalsToInsert,
-      ...physicsPracticalsToInsert,
-    ]);
+    const experiments = await Experiment.insertMany(
+      [
+        ...genericExperimentsToInsert,
+        ...chemistryPracticalsToInsert,
+        ...physicsPracticalsToInsert,
+      ].map(withCurriculumRefs)
+    );
     console.log(
       `✅ Seeded ${experiments.length} experiments (${chemistryPracticalsToInsert.length} Chemistry practicals, ${physicsPracticalsToInsert.length} Physics practicals)`
     );

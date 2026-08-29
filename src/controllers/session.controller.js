@@ -27,6 +27,11 @@ const {
   generateTaskHint,
   generateCircuitHint,
 } = require("../services/labHintService");
+const {
+  curriculumReferenceForStep,
+  practicalCurriculumReference,
+  buildFollowUpReading,
+} = require("../services/curriculumReferenceService");
 
 // Reads the live bench (LabRun.equipment) once and evaluates a *set of requirements* against it —
 // the single source of truth both logAction (does this attempt complete the current unit) and
@@ -43,7 +48,9 @@ const {
 // step's requiredEquipment/requiredChemicalsForStep otherwise), so this stays agnostic to that.
 const evaluateOnBench = async ({ equipment: requiredEquipment = [], chemicals: requiredChemicalIds = [] }, labRunId) => {
   const labRun = labRunId
-    ? await LabRun.findById(labRunId).select("equipment physicsEquipment circuitBoardState reactionsTriggered").lean()
+    ? await LabRun.findById(labRunId)
+        .select("equipment physicsEquipment circuitBoardState reactionsTriggered actions materials")
+        .lean()
     : null;
   // Equipment presence is checked across both bench-state arrays — a physics LabRun only ever
   // populates physicsEquipment, a chemistry one only ever populates equipment, so unioning them
@@ -63,7 +70,16 @@ const evaluateOnBench = async ({ equipment: requiredEquipment = [], chemicals: r
   const equipmentOk = requiredEquipment.every((e) => benchEquipmentTypes.includes(e));
   const chemicalsOk = requiredChemicals.every((id) => benchChemicalIds.includes(id));
 
-  return { labRun, benchEquipmentTypes, benchChemicalIds, equipmentOk, chemicalsOk };
+  // The LabRun material inventory (non-blocking selection): a required chemical the student never
+  // brought into the lab at all is a *different* situation from one they have but haven't added
+  // to a container yet — the hint layer uses this to nudge toward the Material Library vs. toward
+  // the bench, without ever naming the material. An empty inventory (legacy run not seeded) means
+  // "can't tell" → treat as available so hints stay unchanged for old sessions.
+  const inventoryIds = new Set((labRun?.materials || []).map((m) => m.chemical.toString()));
+  const materialsInInventoryOk =
+    inventoryIds.size === 0 || requiredChemicals.every((id) => inventoryIds.has(id));
+
+  return { labRun, benchEquipmentTypes, benchChemicalIds, equipmentOk, chemicalsOk, materialsInInventoryOk };
 };
 
 // Resolves what "the current unit of work" actually requires for a given step, given the
@@ -86,6 +102,8 @@ const resolveGradingTarget = (step, session) => {
       requiresMeasurementCheck: false,
       expectedMeasurement: null,
       requiresCircuitPlacementCheck: false,
+      requiresTransferCheck: false,
+      expectedTransfer: null,
     };
   }
 
@@ -108,6 +126,11 @@ const resolveGradingTarget = (step, session) => {
     // anywhere, now that placement itself is never blocked (see place_component in
     // labRun.controller.js).
     requiresCircuitPlacementCheck: microStep?.expectedIntent === "PLACE_COMPONENT",
+    // A liquid-transfer task set up to require an instrument — by capability (`method`) or exact
+    // type (`instrumentCategory`). See microStepSchema.expectedTransfer / liquidTransferService.
+    // Absent → presence-only grading, unchanged; a direct add still satisfies the task.
+    requiresTransferCheck: !!(microStep?.expectedTransfer?.method || microStep?.expectedTransfer?.instrumentCategory),
+    expectedTransfer: microStep?.expectedTransfer || null,
   };
 };
 
@@ -289,6 +312,11 @@ const submitEquipmentSelection = async (req, res, next) => {
 
 // POST /api/sessions/:id/chemical-selection
 // Body: { selectedChemicalIds: [String] }
+// NON-BLOCKING (like equipment selection): this records what the student *initially thinks* they
+// need and always advances them into the workspace — an incomplete or over-full selection is a
+// learning signal, not a locked door. Missing materials are recovered mid-experiment from the
+// in-lab Material Library (add_material_to_lab), and Current-Task grading always reads the live
+// bench, never this list — so an initial planning mistake is never a permanent task failure.
 const submitChemicalSelection = async (req, res, next) => {
   try {
     const { selectedChemicalIds } = req.body;
@@ -298,8 +326,24 @@ const submitChemicalSelection = async (req, res, next) => {
 
     const session = await Session.findById(req.params.id).populate("experimentId");
     if (!session) return res.status(404).json({ success: false, message: "Session not found." });
+    // Already past selection (e.g. the student navigated back to this screen) — never re-grade or
+    // overwrite the initial selection, and never regress the phase or touch Session/LabRun
+    // progress. Just report where they are so the client can send them back to the workspace.
     if (session.phase !== "chemical_selection") {
-      return res.status(400).json({ success: false, message: "This session is not in the chemical selection phase." });
+      const already = session.chemicalSelection || {};
+      return res.status(200).json({
+        success: true,
+        data: {
+          complete: (already.missing || []).length === 0 && (already.unnecessary || []).length === 0,
+          alreadyEntered: true,
+          correct: already.correct || [],
+          unnecessaryItems: already.unnecessary || [],
+          missingCount: (already.missing || []).length,
+          missingBuildsCount: 0,
+          hint: null,
+          nextPhase: session.phase,
+        },
+      });
     }
 
     const experiment = session.experimentId;
@@ -334,22 +378,28 @@ const submitChemicalSelection = async (req, res, next) => {
     session.chemicalSelection.attempts += 1;
 
     const isComplete = missing.length === 0 && unnecessary.length === 0 && missingBuilds.length === 0;
+
+    // Always advance — the selection is a preparation step, not a gate. The correct/missing/
+    // unnecessary/missingBuilds comparison above is still recorded on the session for analytics,
+    // misconception detection and the report, exactly as before; it just no longer blocks entry.
+    session.phase = "procedure";
+    await session.save();
+
     if (isComplete) {
-      session.phase = "procedure";
-      await session.save();
       return res.status(200).json({
         success: true,
         data: { complete: true, correct, unnecessaryCount: 0, missingCount: 0, missingBuildsCount: 0, nextPhase: session.phase },
       });
     }
 
-    await session.save();
-
     const relatedConcepts = await require("../models/Concept")
       .find({ _id: { $in: experiment.relatedConcepts } })
       .select("name")
       .lean();
 
+    // A gentle, non-revealing "you may want to double-check your materials" note — the student
+    // still proceeds. Names are never revealed here (same principle as the equipment screen);
+    // the in-lab Material Library and the progressive Hint Center handle recovery from here.
     const hint = await generateSelectionHint({
       phase: "chemical",
       experimentTitle: experiment.title,
@@ -366,11 +416,9 @@ const submitChemicalSelection = async (req, res, next) => {
         correct,
         unnecessaryItems: unnecessary,
         missingCount: missing.length,
-        // Count only — which compound(s) still need building is withheld, same "no names
-        // revealed" principle as missingCount above; the student discovers it by attempting
-        // builds via the Compound Builder.
         missingBuildsCount: missingBuilds.length,
         hint,
+        nextPhase: session.phase,
       },
     });
   } catch (error) {
@@ -481,6 +529,17 @@ const logAction = async (req, res, next) => {
     const target = step ? resolveGradingTarget(step, session) : null;
     const gradedMicroStepId = target?.usingMicroSteps ? target.microStep.microStepId : null;
 
+    // When did the current unit of work start? — used to scope the transfer-method check so a
+    // dispense logged during an earlier micro-step can't satisfy this one. May be undefined on the
+    // very first attempt (progress entry not created yet), which is fine: no prior action matches.
+    const currentUnitStartedAt = (() => {
+      const sp = session.stepProgress?.find((s) => s.stepId === stepId);
+      if (!sp) return undefined;
+      return target?.usingMicroSteps
+        ? sp.microSteps?.find((mp) => mp.microStepId === gradedMicroStepId)?.startedAt
+        : sp.startedAt;
+    })();
+
     // The server determines correctness for every step/task type from the live bench — it never
     // trusts a client-submitted "correct" claim (see evaluateOnBench). mismatchKind drives which
     // non-revealing hint (if any) comes back below: an equipment gap takes priority over a chemical
@@ -576,6 +635,19 @@ const logAction = async (req, res, next) => {
         actionType = "incorrect";
         mismatchKind = "chemical";
         conceptViolated = conceptViolated || "LAB_MISSING_CHEMICAL";
+      } else if (target.requiresTransferCheck) {
+        // Equipment + ingredient presence check out, but this task must be done *with the transfer
+        // instrument* — a real `dispense` of the expected source chemical, via the expected
+        // instrument category, into a container other than the source, since this micro-step
+        // started. Dragging the chemical bottle straight in does not satisfy it. Non-revealing:
+        // the expected method never leaves the server.
+        const { wasTransferPerformed } = require("../services/liquidTransferService");
+        const transferOk = wasTransferPerformed(evalResult.labRun, target.expectedTransfer, currentUnitStartedAt);
+        actionType = transferOk ? "correct" : "incorrect";
+        if (!transferOk) {
+          conceptViolated = conceptViolated || "LAB_TRANSFER_METHOD";
+          mismatchKind = "transfer";
+        }
       } else {
         actionType = "correct";
       }
@@ -637,7 +709,8 @@ const logAction = async (req, res, next) => {
       // circuit_placement reuses the equipment counter — it's still fundamentally a "wrong
       // equipment configuration" mistake, and adding a dedicated counter would need a Session
       // schema change for no behavioral difference in the escalation math below.
-      if (mismatchKind === "equipment" || mismatchKind === "circuit_placement") activeEntry.equipmentMistakes += 1;
+      if (mismatchKind === "equipment" || mismatchKind === "circuit_placement" || mismatchKind === "transfer")
+        activeEntry.equipmentMistakes += 1;
       else if (mismatchKind === "chemical") activeEntry.chemicalMistakes += 1;
       activeEntry.solvedIndependently = false;
       autoHintLevel = Math.min(activeEntry.equipmentMistakes + activeEntry.chemicalMistakes, 3);
@@ -744,8 +817,14 @@ const logAction = async (req, res, next) => {
           stepInstruction: activePrompt,
           stepActionType: step.actionType,
           requiredChemicalCategories: [...new Set(requiredChemicalDocs.map((c) => c.category))],
+          // false → the required material isn't even in the student's lab: nudge toward the
+          // Material Library, still without naming it (see generateChemicalHint).
+          materialAvailable: evalResult.materialsInInventoryOk,
           level: autoHintLevel,
         }),
+        // Non-answer recovery hint — lets the client offer an "Open Material Library" affordance
+        // on the proactive banner / in the Hint Center. Never names the material.
+        suggestedAction: evalResult.materialsInInventoryOk ? null : "open_material_library",
       };
     } else if (mismatchKind === "circuit_placement") {
       // Deliberately doesn't say WHICH slot is wrong or WHAT belongs there — that's the whole
@@ -788,6 +867,14 @@ const logAction = async (req, res, next) => {
           context: { stepId, microStepId: gradedMicroStepId, attempts: stepErrors },
         }),
       };
+    }
+
+    // A student who keeps missing a step gets the textbook lesson/page pointer on the proactive
+    // banner too — same precomputed ref the on-demand hint ladder uses (curriculumReferenceService),
+    // gated to a genuine struggle signal (2+ errors on this task) so it isn't shown on a first slip.
+    if (intervention && stepErrors >= 2 && step) {
+      const curriculumReference = curriculumReferenceForStep(step, experiment);
+      if (curriculumReference) intervention.curriculumReference = curriculumReference;
     }
 
     res.status(201).json({
@@ -920,6 +1007,17 @@ const getSessionReport = async (req, res, next) => {
       }))
     );
 
+    // Curriculum placement of the whole practical — "this practical is covered by <lesson>,
+    // pages A–B of the <textbook>" — shown in the report regardless of performance. Plus
+    // "follow-up reading": extra textbook pages for the specific steps the student struggled on
+    // (Session.behaviorFeatures.struggledSteps). Both come from the precomputed curriculum map
+    // and are null/empty until the sync job has run (npm run curriculum:sync -- --apply).
+    const practicalReference = practicalCurriculumReference(experiment);
+    const followUpReading = buildFollowUpReading(
+      experiment,
+      session.behaviorFeatures?.struggledSteps || []
+    );
+
     res.status(200).json({
       success: true,
       data: {
@@ -945,6 +1043,8 @@ const getSessionReport = async (req, res, next) => {
         },
         aiFeedback: session.aiFeedback,
         conceptsToImprove: session.aiFeedback.conceptsToImprove || [],
+        practicalReference,
+        followUpReading,
         finalUnderstandingAssessment: session.aiFeedback.finalUnderstandingAssessment || null,
         score: session.score,
         totalTime: session.totalTime,
@@ -967,7 +1067,7 @@ const getSession = async (req, res, next) => {
       // steps.title/instruction above them.
       .populate(
         "experimentId",
-        "-requiredEquipment -requiredChemicals -reactionId -steps.expectedAction -steps.requiredChemicalsForStep -steps.requiredEquipment -steps.exactAnswer -steps.observationGoal -steps.microSteps.expectedIntent -steps.microSteps.expectedEquipment -steps.microSteps.expectedChemicalsForStep -steps.microSteps.hints -steps.microSteps.exactAnswer -steps.microSteps.expectedMeasurement"
+        "-requiredEquipment -requiredChemicals -reactionId -steps.expectedAction -steps.requiredChemicalsForStep -steps.requiredEquipment -steps.exactAnswer -steps.observationGoal -curriculumRefs -curriculumRefsGeneratedAt -steps.curriculumRefs -steps.microSteps.expectedIntent -steps.microSteps.expectedEquipment -steps.microSteps.expectedChemicalsForStep -steps.microSteps.hints -steps.microSteps.exactAnswer -steps.microSteps.expectedMeasurement -steps.microSteps.expectedTransfer"
       )
       .lean();
     if (!session) return res.status(404).json({ success: false, message: "Session not found." });
@@ -1144,6 +1244,10 @@ const requestHint = async (req, res, next) => {
     // MEASURE_RESULT/RECORD_RESULT — nothing to place on the bench) falls back to its own authored
     // hints, then the shared generic task-hint generator.
     let hintText;
+    // Non-answer metadata the client may use to offer a recovery action (currently just the
+    // Material Library). Never carries the required material's name/id — that stays server-side
+    // until the Help reveal (see requestHelp).
+    let suggestedAction = null;
     if (target.requiresCircuitPlacementCheck) {
       // Electricity (Phase B): a PLACE_COMPONENT task's real gap is slot correctness, not
       // equipment presence (the equipment usually already exists on the bench) — route straight
@@ -1156,12 +1260,31 @@ const requestHint = async (req, res, next) => {
         level: hintLevel,
       });
     } else if (target.equipment.length > 0 || target.chemicals.length > 0) {
-      const { equipmentOk, chemicalsOk, benchEquipmentTypes } = await evaluateOnBench(
+      const { equipmentOk, chemicalsOk, benchEquipmentTypes, materialsInInventoryOk } = await evaluateOnBench(
         { equipment: target.equipment, chemicals: target.chemicals },
         session.labRunId
       );
 
-      if (!equipmentOk || chemicalsOk) {
+      // Priority: a required material that isn't even in the student's lab inventory is the most
+      // fundamental blocker for this task AND the one with a concrete recovery path — surface it
+      // before an equipment gap. The hint never names the material; it points at where to act.
+      const materialMissingFromLab = target.chemicals.length > 0 && !materialsInInventoryOk;
+
+      if (materialMissingFromLab) {
+        const requiredChemicalDocs = await Chemical.find({ _id: { $in: target.chemicals } })
+          .select("category")
+          .lean();
+        hintText = await generateChemicalHint({
+          experimentTitle: session.experimentId.title,
+          stepTitle: step.title,
+          stepInstruction: activePrompt,
+          stepActionType: step.actionType,
+          requiredChemicalCategories: [...new Set(requiredChemicalDocs.map((c) => c.category))],
+          materialAvailable: false,
+          level: hintLevel,
+        });
+        suggestedAction = "open_material_library";
+      } else if (!equipmentOk || chemicalsOk) {
         hintText = await generateEquipmentHint({
           experimentTitle: session.experimentId.title,
           stepTitle: step.title,
@@ -1172,6 +1295,7 @@ const requestHint = async (req, res, next) => {
           level: hintLevel,
         });
       } else {
+        // The material IS in the lab, just not on the bench yet — nudge toward the bench, not the Library.
         const requiredChemicalDocs = await Chemical.find({ _id: { $in: target.chemicals } })
           .select("category")
           .lean();
@@ -1181,6 +1305,7 @@ const requestHint = async (req, res, next) => {
           stepInstruction: activePrompt,
           stepActionType: step.actionType,
           requiredChemicalCategories: [...new Set(requiredChemicalDocs.map((c) => c.category))],
+          materialAvailable: true,
           level: hintLevel,
         });
       }
@@ -1200,7 +1325,16 @@ const requestHint = async (req, res, next) => {
       }
     }
 
-    // Log hint request
+    // From hint level 2 onward, also point the student at the textbook lesson/pages that cover
+    // this step (precomputed by npm run curriculum:sync, see curriculumReferenceService).
+    // This is a separate structured field — never folded into hintText — so the hint itself stays
+    // non-revealing; a "go read this" pointer is not an answer. null when no confident ref exists
+    // (e.g. a Grade 11 practical before the Grade 11 textbook is ingested).
+    const curriculumReference =
+      hintLevel >= 2 ? curriculumReferenceForStep(step, session.experimentId) : null;
+
+    // Log hint request — the actionDetail records a missing-material hint so the report/analytics
+    // can reconstruct the "missed a material → asked for help → recovered" pattern (spec §16/§18).
     await Action.create({
       sessionId: session._id,
       userId: req.user._id,
@@ -1208,7 +1342,10 @@ const requestHint = async (req, res, next) => {
       stepId,
       microStepId: gradedMicroStepId,
       actionType: "hint_requested",
-      actionDetail: `Hint level ${hintLevel} requested`,
+      actionDetail:
+        (suggestedAction === "open_material_library"
+          ? `Hint level ${hintLevel} requested (missing_material)`
+          : `Hint level ${hintLevel} requested`) + (curriculumReference ? " (curriculum ref shown)" : ""),
       hintLevel,
       timeTaken: 0,
     });
@@ -1222,7 +1359,19 @@ const requestHint = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: { hintLevel, hintText, stepId, microStepId: gradedMicroStepId, helpAvailable: hintLevel >= 3 },
+      data: {
+        hintLevel,
+        hintText,
+        stepId,
+        microStepId: gradedMicroStepId,
+        helpAvailable: hintLevel >= 3,
+        // Non-answer recovery hint for the client (e.g. show an "Open Material Library" button in
+        // the Hint Center). null unless a required material is genuinely absent from the lab.
+        suggestedAction,
+        // Textbook lesson/page pointer for this step (hint level >= 2 only). null when there's no
+        // confident curriculum match. See curriculumReferenceService.formatCurriculumReference.
+        curriculumReference,
+      },
     });
   } catch (error) {
     next(error);
@@ -1255,9 +1404,25 @@ const requestHelp = async (req, res, next) => {
       });
     }
 
-    const requiredChemicalDocs = target.chemicals?.length
-      ? await Chemical.find({ _id: { $in: target.chemicals } }).select("name symbol").lean()
+    // Live bench state — Help turns the hidden requirements into a concrete action against THIS
+    // (see helpActionService.buildHelpAction): which container instance, what it already holds,
+    // which transfer tool, what quantity.
+    const labRun = session.labRunId
+      ? await LabRun.findById(session.labRunId).select("equipment").lean()
+      : null;
+
+    // Names for every chemical the instruction might mention: the task's expected chemicals plus
+    // whatever is already sitting in the bench containers.
+    const chemicalIdSet = new Set((target.chemicals || []).map((id) => id.toString()));
+    (labRun?.equipment || []).forEach((e) =>
+      (e.contents || []).forEach((c) => c.chemical && chemicalIdSet.add(c.chemical.toString()))
+    );
+    const chemicalDocs = chemicalIdSet.size
+      ? await Chemical.find({ _id: { $in: [...chemicalIdSet] } }).select("name symbol").lean()
       : [];
+    const requiredChemicalDocs = chemicalDocs.filter((c) =>
+      (target.chemicals || []).some((id) => id.toString() === c._id.toString())
+    );
 
     activeEntry.helpUsed = true;
     activeEntry.solvedIndependently = false;
@@ -1278,6 +1443,19 @@ const requestHelp = async (req, res, next) => {
       ? target.microStep.exactAnswer || step.exactAnswer || step.observationGoal || step.expectedAction
       : step.exactAnswer || step.observationGoal || step.expectedAction;
 
+    // The improved Help payload: an explicit procedural action derived from the hidden
+    // requirements + the live bench (correct container instance, its current contents, the
+    // transfer tool, the quantity). Falls back to `explanation` when nothing more specific can
+    // be synthesised (e.g. an OBSERVE_RESULT task with no bench gap).
+    const { buildHelpAction } = require("../services/helpActionService");
+    const { actionInstruction, actionSteps } = buildHelpAction({
+      target,
+      step,
+      experiment: session.experimentId,
+      labRun,
+      chemicalDocs,
+    });
+
     res.status(200).json({
       success: true,
       data: {
@@ -1285,6 +1463,9 @@ const requestHelp = async (req, res, next) => {
         microStepId: gradedMicroStepId,
         equipment: target.equipment,
         chemicals: requiredChemicalDocs.map((c) => ({ name: c.name, symbol: c.symbol })),
+        // The exact action to perform, and (for multi-step tasks) the ordered sequence.
+        actionInstruction: actionInstruction || explanation || null,
+        actionSteps: actionSteps || [],
         explanation,
       },
     });

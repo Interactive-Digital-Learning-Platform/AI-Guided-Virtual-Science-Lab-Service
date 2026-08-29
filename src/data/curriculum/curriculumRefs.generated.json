@@ -1,0 +1,693 @@
+{
+  "Acid-Base Neutralization": {
+    "generatedAt": "2026-08-28T22:12:23.156Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Acids, Bases and Salts",
+        "sectionTitle": "7.4 Neutralisation",
+        "pageStart": 208,
+        "pageEnd": 209,
+        "confidence": 0.96,
+        "snippet": "You have studied the fact that when acids react with bases, salts and water are produced. HCl (aq) + NaOH (aq) → NaCl (aq) + H2O (l). H+ (aq) + OH- (aq) → H2O (l).",
+        "sourceChunkIds": [
+          "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+          "4153615a-7970-5840-a6a2-f838593801af",
+          "d72cf708-a72e-599c-9fee-6c161abf5168",
+          "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+          "c878e830-f191-5582-9fd9-0c9b5ed29754"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Mixtures",
+          "sectionTitle": "Preparing a solution of a specific concentration",
+          "pageStart": 59,
+          "pageEnd": 60,
+          "confidence": 0.85,
+          "snippet": "When preparing a solution of a specific concentration, following factors should be taken into consideration. 1. Cleanliness of all the equipment used. 2. Weighing the solute accurately.",
+          "sourceChunkIds": [
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "db14365e-042d-5258-b4a3-cbeee6f3a9f9",
+            "e556c4d7-56c3-57ad-8ce8-cd0ddea2f579"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Heat Changes Associated with Chemical Reactions",
+          "sectionTitle": "Setting up the neutralisation reaction",
+          "pageStart": 215,
+          "pageEnd": 217,
+          "confidence": 0.95,
+          "snippet": "To two beakers, measure 50 cm³ of NaOH solution and 50 cm³ of HCl solution separately, record temperatures, mix them in a polystyrene cup, stir with a glass rod and record the maximum temperature.",
+          "sourceChunkIds": [
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "e29d851b-12c8-51fa-90fa-e08eb6e305c1",
+            "fc0c4200-6ea2-5303-9cda-b7b3aa3a0fa0"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Indicators",
+          "pageStart": 205,
+          "pageEnd": 207,
+          "confidence": 0.93,
+          "snippet": "Materials required : Blue litmus, red litmus, methyl orange, phenolphthalein, lime juice, dilute hydrochloric acid... Add the given indicators to the solutions given above and record the observations.",
+          "sourceChunkIds": [
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "888bd746-854e-58bc-bdae-f3670fa1dacf",
+            "d7326058-3ee7-5031-b29d-7d1cdf8010ff"
+          ]
+        }
+      ],
+      "4": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "7.4 Neutralisation",
+          "pageStart": 208,
+          "pageEnd": 209,
+          "confidence": 0.96,
+          "snippet": "H+ (aq) + OH- (aq) → H2O (l). The H+ ions released by the acid combine with OH- ions from the base to form water, illustrating the neutralisation step.",
+          "sourceChunkIds": [
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "4153615a-7970-5840-a6a2-f838593801af",
+            "68fe5665-0f3b-50e6-8da9-acbca37b6709",
+            "e556c4d7-56c3-57ad-8ce8-cd0ddea2f579",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754"
+          ]
+        }
+      ],
+      "5": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Indicators for Acid‑Base Neutralization",
+          "pageStart": 205,
+          "pageEnd": 207,
+          "confidence": 0.92,
+          "snippet": "Materials required : Blue litmus, red litmus, methyl orange, phenolphthalein, lime juice, dilute hydrochloric acid, dilute sulphuric acid, vinegar, dilute sodium hydroxide solution, soap solution",
+          "sourceChunkIds": [
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "d7326058-3ee7-5031-b29d-7d1cdf8010ff",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "68fe5665-0f3b-50e6-8da9-acbca37b6709"
+          ]
+        }
+      ]
+    }
+  },
+  "Acid-Base Titration": {
+    "generatedAt": "2026-08-28T22:12:23.156Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Acids, Bases and Salts",
+        "sectionTitle": "Indicators and identification of acids and bases",
+        "pageStart": 205,
+        "pageEnd": 207,
+        "confidence": 0.85,
+        "snippet": "Materials required: Blue litmus, red litmus, methyl orange, phenolphthalein, lime juice, dilute HCl, dilute H2SO4, vinegar, dilute NaOH, soap solution. Add indicators to solutions and record observati",
+        "sourceChunkIds": [
+          "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+          "4153615a-7970-5840-a6a2-f838593801af",
+          "c878e830-f191-5582-9fd9-0c9b5ed29754",
+          "d7326058-3ee7-5031-b29d-7d1cdf8010ff",
+          "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4"
+        ]
+      }
+    ],
+    "steps": {
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Heat Changes Associated with Chemical Reactions",
+          "sectionTitle": "Heat Changes Associated with Chemical Reactions",
+          "pageStart": 215,
+          "pageEnd": 217,
+          "confidence": 0.92,
+          "snippet": "To two beakers, measure 50 cm³ of the sodium hydroxide solution and 50 cm³ of the hydrochloric acid solution separately using the measuring cylinder.",
+          "sourceChunkIds": [
+            "e29d851b-12c8-51fa-90fa-e08eb6e305c1",
+            "d6a6aa35-f28d-55ba-8a26-be387aca304d",
+            "22f6df11-febb-5b4e-92f4-f4113af5af86",
+            "254c70a6-69a6-508d-9a72-482a4fa03dd5",
+            "d7326058-3ee7-5031-b29d-7d1cdf8010ff"
+          ]
+        }
+      ],
+      "7": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Mixtures",
+          "sectionTitle": "Concentration and composition of mixtures",
+          "pageStart": 78,
+          "pageEnd": 79,
+          "confidence": 0.42,
+          "snippet": "• Among the different notations used, mole-volume ratio (n/V) is also known as the concentration. It has the units of mol dm-3 (moles per cubic decimetre) ... Solutes of known composition need to be p",
+          "sourceChunkIds": [
+            "56bed18f-402d-5139-82b3-4d463e87ee7a",
+            "4b6035e7-81c3-50df-9204-b7f93ba822b8",
+            "6223c128-5618-5ed1-bd2b-29e841f976c5",
+            "116a64cc-1290-56c8-8043-7e42d1e7c5bb",
+            "7bde4006-8770-52ce-b610-02a87666459a"
+          ]
+        }
+      ]
+    }
+  },
+  "Identification of Gases": {
+    "generatedAt": "2026-08-28T22:12:23.156Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Hydrocarbons and Their Derivatives",
+        "sectionTitle": "Activity 14.1 – Confirming the pressure of carbon and hydrogen in candle wax",
+        "pageStart": 383,
+        "pageEnd": 383,
+        "confidence": 0.85,
+        "snippet": "Set up the apparatus, light the candle, pass air through; copper sulphate turns blue (hydrogen) and lime water turns milky (CO₂).",
+        "sourceChunkIds": [
+          "dcf32f3f-5adf-5f51-8e95-3afcb895a32d",
+          "888bd746-854e-58bc-bdae-f3670fa1dacf",
+          "c5b394a3-70f5-5c40-8bc8-e2ed018651ac",
+          "6814a135-4897-5c0a-8ade-5f3b1d1c11a3",
+          "fc0c4200-6ea2-5303-9cda-b7b3aa3a0fa0"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Electrochemistry",
+          "sectionTitle": "Activity 12.1.1 – Reaction of Zinc with Dilute Sulphuric Acid",
+          "pageStart": 310,
+          "pageEnd": 311,
+          "confidence": 0.88,
+          "snippet": "Add dilute sulphuric acid to a small beaker, place a zinc metal strip in it; gas bubbles are liberated near the zinc strip.",
+          "sourceChunkIds": [
+            "fc0c4200-6ea2-5303-9cda-b7b3aa3a0fa0",
+            "e29d851b-12c8-51fa-90fa-e08eb6e305c1",
+            "d6a6aa35-f28d-55ba-8a26-be387aca304d",
+            "254c70a6-69a6-508d-9a72-482a4fa03dd5",
+            "afb213ed-9dca-56c2-aa92-c245eedd40ed"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Hydrocarbons and Their Derivatives",
+          "sectionTitle": "Activity 14.1 – Confirming the pressure of carbon and hydrogen in candle wax",
+          "pageStart": 383,
+          "pageEnd": 383,
+          "confidence": 0.78,
+          "snippet": "Set the apparatus as shown, light the candle, connect to the aspirator and make air pass through. The water produced during burning indicates hydrogen gas.",
+          "sourceChunkIds": [
+            "fc0c4200-6ea2-5303-9cda-b7b3aa3a0fa0",
+            "afb213ed-9dca-56c2-aa92-c245eedd40ed",
+            "e29d851b-12c8-51fa-90fa-e08eb6e305c1",
+            "bac63e80-9fac-5bb2-9bc0-dd3ca5f3ec86",
+            "c5b394a3-70f5-5c40-8bc8-e2ed018651ac"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Photosynthesis",
+          "sectionTitle": "Gas identification in photosynthesis",
+          "pageStart": 37,
+          "pageEnd": 38,
+          "confidence": 0.78,
+          "snippet": "A glowing splinter is inserted to test whether the gas is oxygen. The splinter will burn with a bright flame, indicating the gas is oxygen.",
+          "sourceChunkIds": [
+            "c5b394a3-70f5-5c40-8bc8-e2ed018651ac",
+            "6814a135-4897-5c0a-8ade-5f3b1d1c11a3",
+            "bcab9f53-212b-5f16-baeb-9709ea8737fc",
+            "334b9811-9379-5ced-8ac1-b8c326eca9a8",
+            "fc0c4200-6ea2-5303-9cda-b7b3aa3a0fa0"
+          ]
+        }
+      ]
+    }
+  },
+  "Metal Displacement Reactions": {
+    "generatedAt": "2026-08-28T22:12:23.156Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Electrochemistry",
+        "sectionTitle": "Activity 12.1.1",
+        "pageStart": 310,
+        "pageEnd": 311,
+        "confidence": 0.96,
+        "snippet": "Add dilute sulphuric acid to a beaker, place a zinc strip, observe gas bubbles and dissolution of zinc as the metal reacts with the acid.",
+        "sourceChunkIds": [
+          "62faa75d-937a-59bf-a51d-52db1e325370",
+          "254c70a6-69a6-508d-9a72-482a4fa03dd5",
+          "494fb035-0411-511f-9ae3-42a7fd526cdc",
+          "bd4311d9-7b92-54e1-b422-423077783e0e",
+          "434bb05e-a73e-5233-b2bd-695ed725d7e2"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Electrochemistry",
+          "sectionTitle": "Activity 12.1.1 – Preparation of Zinc Metal Sample",
+          "pageStart": 310,
+          "pageEnd": 311,
+          "confidence": 0.85,
+          "snippet": "Materials required – a small beaker, dilute sulphuric acid, a zinc metal sheet. Add dilute sulphuric acid to the beaker and place a strip of zinc metal sheet so that a part dips in the solution. Recor",
+          "sourceChunkIds": [
+            "3a735683-de72-57b0-b696-265451427ff7",
+            "254c70a6-69a6-508d-9a72-482a4fa03dd5",
+            "bc480248-4a08-5b6e-8159-19e0dfd4bf87",
+            "62faa75d-937a-59bf-a51d-52db1e325370",
+            "434bb05e-a73e-5233-b2bd-695ed725d7e2"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Mixtures",
+          "sectionTitle": "Activity 3.2.2 – Preparing Salt Solutions",
+          "pageStart": 59,
+          "pageEnd": 60,
+          "confidence": 0.92,
+          "snippet": "When preparing a solution of a specific concentration... prepare 250 cm³ of 1 mol dm⁻³ sodium chloride (NaCl).",
+          "sourceChunkIds": [
+            "254c70a6-69a6-508d-9a72-482a4fa03dd5",
+            "62faa75d-937a-59bf-a51d-52db1e325370",
+            "b84eedee-44df-5623-93d7-9affc63f3803",
+            "3a735683-de72-57b0-b696-265451427ff7",
+            "db14365e-042d-5258-b4a3-cbeee6f3a9f9"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Electrochemistry",
+          "sectionTitle": "Activity 12.1.1 – Reaction of Zinc with Dilute Sulphuric Acid",
+          "pageStart": 310,
+          "pageEnd": 311,
+          "confidence": 0.95,
+          "snippet": "Add dilute sulphuric acid to the small beaker. Place a strip of zinc metal sheet in the beaker so that a part of it dips in the sulphuric acid solution. Gas bubbles are liberated near the zinc strip a",
+          "sourceChunkIds": [
+            "62faa75d-937a-59bf-a51d-52db1e325370",
+            "254c70a6-69a6-508d-9a72-482a4fa03dd5",
+            "494fb035-0411-511f-9ae3-42a7fd526cdc",
+            "3a735683-de72-57b0-b696-265451427ff7",
+            "7d91b5db-297f-566f-a916-2ef355486533"
+          ]
+        }
+      ],
+      "4": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Electrochemistry",
+          "sectionTitle": "Metal Displacement Reactions",
+          "pageStart": 338,
+          "pageEnd": 339,
+          "confidence": 0.92,
+          "snippet": "Appearance of blue colour around the iron nails ... indicates the formation of Fe2+ ions, showing that the iron nails have corroded.",
+          "sourceChunkIds": [
+            "3a735683-de72-57b0-b696-265451427ff7",
+            "62faa75d-937a-59bf-a51d-52db1e325370",
+            "254c70a6-69a6-508d-9a72-482a4fa03dd5",
+            "bd4311d9-7b92-54e1-b422-423077783e0e",
+            "bc480248-4a08-5b6e-8159-19e0dfd4bf87"
+          ]
+        }
+      ]
+    }
+  },
+  "Testing Acids and Bases": {
+    "generatedAt": "2026-08-28T22:12:23.156Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Acids, Bases and Salts",
+        "sectionTitle": "Testing Acids and Bases (practical)",
+        "pageStart": 205,
+        "pageEnd": 207,
+        "confidence": 0.95,
+        "snippet": "Materials required: blue litmus, red litmus, methyl orange, phenolphthalein, lime juice, dilute HCl, dilute H2SO4, vinegar, dilute NaOH, soap solution. Add indicators to solutions and record observati",
+        "sourceChunkIds": [
+          "d7326058-3ee7-5031-b29d-7d1cdf8010ff",
+          "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+          "d72cf708-a72e-599c-9fee-6c161abf5168",
+          "c878e830-f191-5582-9fd9-0c9b5ed29754",
+          "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Testing Acids and Bases with Indicators",
+          "pageStart": 205,
+          "pageEnd": 207,
+          "confidence": 0.93,
+          "snippet": "Materials required : Blue litmus, red litmus, methyl orange, phenolphthalein, lime juice, dilute hydrochloric acid, dilute sulphuric acid, vinegar, dilute sodium hydroxide solution, soap solution",
+          "sourceChunkIds": [
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "d7326058-3ee7-5031-b29d-7d1cdf8010ff",
+            "d72cf708-a72e-599c-9fee-6c161abf5168"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Acids and Bases",
+          "pageStart": 209,
+          "pageEnd": 210,
+          "confidence": 0.85,
+          "snippet": "The substances that release H+ ions in aqueous solution are called acids... Both acids and bases change the colour of indicators.",
+          "sourceChunkIds": [
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "68fe5665-0f3b-50e6-8da9-acbca37b6709",
+            "dcf32f3f-5adf-5f51-8e95-3afcb895a32d"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Acids and Bases",
+          "pageStart": 209,
+          "pageEnd": 210,
+          "confidence": 0.78,
+          "snippet": "Both acids and bases change the colour of indicators. An acid releases H+ ions, a base increases OH- ions; strong vs weak definitions are given.",
+          "sourceChunkIds": [
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "68fe5665-0f3b-50e6-8da9-acbca37b6709",
+            "d72cf708-a72e-599c-9fee-6c161abf5168"
+          ]
+        }
+      ],
+      "4": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Acids and Bases",
+          "pageStart": 209,
+          "pageEnd": 210,
+          "confidence": 0.85,
+          "snippet": "The substances that release H+ ions in aqueous solution are called acids... Both acids and bases change the colour of indicators. Strong/weak acids and bases are defined by degree of ionisation.",
+          "sourceChunkIds": [
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "e556c4d7-56c3-57ad-8ce8-cd0ddea2f579",
+            "f9a7e942-3f7c-5f25-ae9a-b102a1d8c055"
+          ]
+        }
+      ]
+    }
+  },
+  "Hooke's Law — Spring Constant": {
+    "generatedAt": "2026-08-28T22:38:34.586Z",
+    "experimentRefs": [],
+    "steps": {}
+  },
+  "Measuring Density by Displacement": {
+    "generatedAt": "2026-08-28T22:38:38.362Z",
+    "experimentRefs": [],
+    "steps": {}
+  },
+  "Ohm's Law Verification": {
+    "generatedAt": "2026-08-28T22:39:07.078Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Direct Currents and Alternating Currents",
+        "sectionTitle": "Direct Current Circuits",
+        "pageStart": 369,
+        "pageEnd": 371,
+        "confidence": 0.6,
+        "snippet": "Figure 13.32(a) shows a circuit connecting a battery, a resistor and a center-zero galvanometer in series.",
+        "sourceChunkIds": [
+          "eed95f46-2019-586c-9aa6-d673476ee058",
+          "1320970e-34e2-53b2-ad2a-664246ff1d28",
+          "302f3bf4-b2ee-50ab-8e0d-4b174e42ff24",
+          "96ec6052-fb94-5c92-9cb5-b2d88cdf9adb",
+          "6d12553d-d653-54f4-a4e6-0d49c05725fa"
+        ]
+      }
+    ],
+    "steps": {
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Voltage Divider",
+          "sectionTitle": "Resistor Value Calculation",
+          "pageStart": 306,
+          "pageEnd": 306,
+          "confidence": 0.95,
+          "snippet": "If R = 10 kΩ, the value of R2 in order that V= 0.7 V: 3 × R2 / (10,000 + R2) = 0.7",
+          "sourceChunkIds": [
+            "4bf4104d-617d-56d9-a049-5faaefba20e0",
+            "96ec6052-fb94-5c92-9cb5-b2d88cdf9adb",
+            "eed95f46-2019-586c-9aa6-d673476ee058",
+            "6d12553d-d653-54f4-a4e6-0d49c05725fa",
+            "302f3bf4-b2ee-50ab-8e0d-4b174e42ff24"
+          ]
+        }
+      ],
+      "4": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Electronics Physics",
+          "sectionTitle": "Voltage Divider and Resistance Calculation",
+          "pageStart": 306,
+          "pageEnd": 306,
+          "confidence": 0.6,
+          "snippet": "If R = 10 kΩ, the value of R2 in order that V= 0.7 V: 3 × R2 / (10,000 + R2) = 0.7",
+          "sourceChunkIds": [
+            "4bf4104d-617d-56d9-a049-5faaefba20e0",
+            "6d12553d-d653-54f4-a4e6-0d49c05725fa",
+            "1320970e-34e2-53b2-ad2a-664246ff1d28",
+            "96ec6052-fb94-5c92-9cb5-b2d88cdf9adb",
+            "dcb610f8-eff5-5783-8540-bd0fb1c0a649"
+          ]
+        }
+      ]
+    }
+  },
+  "Series and Parallel Resistor Combinations": {
+    "generatedAt": "2026-08-28T22:40:12.700Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Voltage Dividers",
+        "sectionTitle": "Series Resistor Combinations",
+        "pageStart": 306,
+        "pageEnd": 306,
+        "confidence": 0.95,
+        "snippet": "VB = R2 × 3 / (R1 + R2) – By keeping R1 constant and varying R2, any potential from 0 to 3 V can be given to that point.",
+        "sourceChunkIds": [
+          "4bf4104d-617d-56d9-a049-5faaefba20e0",
+          "eed95f46-2019-586c-9aa6-d673476ee058",
+          "dcb610f8-eff5-5783-8540-bd0fb1c0a649",
+          "96ec6052-fb94-5c92-9cb5-b2d88cdf9adb",
+          "50327c74-b449-5d33-a698-d17886dee9a0"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Direct Currents and Alternating Currents",
+          "sectionTitle": "Direct Currents and Alternating Currents",
+          "pageStart": 369,
+          "pageEnd": 371,
+          "confidence": 0.9,
+          "snippet": "Figure 13.32(a) shows a circuit connecting a battery, a resistor and a center-zero galvanometer in series.",
+          "sourceChunkIds": [
+            "dcb610f8-eff5-5783-8540-bd0fb1c0a649",
+            "eed95f46-2019-586c-9aa6-d673476ee058",
+            "50327c74-b449-5d33-a698-d17886dee9a0",
+            "1aa3fe78-4772-56d5-adab-358dca1130cc",
+            "059eca85-4e77-5275-bf31-61794adf4d6a"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Direct Currents and Alternating Currents",
+          "sectionTitle": "13.3.3 Direct Currents and Alternating Currents",
+          "pageStart": 369,
+          "pageEnd": 371,
+          "confidence": 0.6,
+          "snippet": "Figure 13.32(a) shows a circuit connecting a battery, a resistor and a center-zero galvanometer in series. (The resistor prevents a large current from passing through the galvanometer).",
+          "sourceChunkIds": [
+            "eed95f46-2019-586c-9aa6-d673476ee058",
+            "74a604c0-1f1d-59ea-9732-26f7fa0c6132",
+            "1320970e-34e2-53b2-ad2a-664246ff1d28",
+            "dcb610f8-eff5-5783-8540-bd0fb1c0a649",
+            "116a64cc-1290-56c8-8043-7e42d1e7c5bb"
+          ]
+        }
+      ]
+    }
+  },
+  "Simple Pendulum — Measuring g": {
+    "generatedAt": "2026-08-28T22:41:32.621Z",
+    "experimentRefs": [],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Oscillations",
+          "sectionTitle": "Extra Knowledge",
+          "pageStart": 88,
+          "pageEnd": 90,
+          "confidence": 0.9,
+          "snippet": "The motion of the particle from time t0 to t4 is called one oscillation.",
+          "sourceChunkIds": [
+            "531bbdb4-af17-504b-b124-2df2c68a7371",
+            "50327c74-b449-5d33-a698-d17886dee9a0",
+            "53484fbb-cc80-5b7d-8bd6-d913bc6ef30d",
+            "fdcdfabb-f4a8-5733-bacf-65938899e34a",
+            "aab5938c-f67d-5e5e-9ae3-9895d35126fc"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Waves and Oscillations",
+          "sectionTitle": "Period of Oscillation",
+          "pageStart": 90,
+          "pageEnd": 90,
+          "confidence": 0.9,
+          "snippet": "The time taken by a particle for a complete oscillation is known as the period (T).",
+          "sourceChunkIds": [
+            "531bbdb4-af17-504b-b124-2df2c68a7371",
+            "48328f38-fe5a-589b-b1d7-a57275641973",
+            "f178681d-6760-517e-96d7-ca1ff3ecc3cc",
+            "ac4995f9-0190-5fe3-a0c1-2c9959051bc4",
+            "50327c74-b449-5d33-a698-d17886dee9a0"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Period of Oscillation",
+          "sectionTitle": "Period",
+          "pageStart": 90,
+          "pageEnd": 90,
+          "confidence": 0.8,
+          "snippet": "The time taken by a particle for a complete oscillation is known as the period (T).",
+          "sourceChunkIds": [
+            "531bbdb4-af17-504b-b124-2df2c68a7371",
+            "53484fbb-cc80-5b7d-8bd6-d913bc6ef30d",
+            "48328f38-fe5a-589b-b1d7-a57275641973",
+            "ac4995f9-0190-5fe3-a0c1-2c9959051bc4",
+            "007b2361-ee3b-5e7e-a431-79efba6c4c83"
+          ]
+        }
+      ]
+    }
+  }
+}

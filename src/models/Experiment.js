@@ -57,6 +57,21 @@ const microStepSchema = new mongoose.Schema(
       expectedValue: { type: Number, default: null },
       tolerancePct: { type: Number, default: 10 },
     },
+    // TRANSFER_LIQUID / ADD_REAGENT tasks that must be done *with a transfer instrument*, not by
+    // dragging the chemical bottle straight into the target. Satisfied only by a real `dispense`
+    // of `sourceChemical` into a container other than the source, on/after this micro-step started
+    // (see liquidTransferService + session.controller.js's transfer grading branch). Absent →
+    // grading is unchanged (presence-only). Answer-bearing → withheld from the client.
+    //   - `method`: a CAPABILITY (equipmentCapabilities.js) — any instrument carrying it is
+    //     accepted (curriculum-flexible). Preferred.
+    //   - `instrumentCategory`: an EXACT equipment type — only when the science requires that
+    //     specific instrument. If both are set, `method` wins.
+    expectedTransfer: {
+      method: { type: String, default: null }, // e.g. "small_quantity_transfer" / "accurate_volume_transfer"
+      instrumentCategory: { type: String, enum: ["dropper", "pipette", "burette", null], default: null },
+      sourceChemical: { type: mongoose.Schema.Types.ObjectId, ref: "Chemical", default: null },
+      minDispenses: { type: Number, default: 1 },
+    },
     // Per-task 3-level hint ladder, same shape/withholding as the parent step's hints — only
     // used as a fallback when Gemini-backed generation (labHintService.js) is unavailable.
     hints: [
@@ -68,6 +83,31 @@ const microStepSchema = new mongoose.Schema(
     // This task's own "no more hints, here's the answer" explanation — only ever sent to the
     // client from requestHelp, and only once hint level 3 has been shown for this task.
     exactAnswer: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+// A pointer into the ingested Sri Lankan curriculum knowledge base (grade 10/11 textbooks) —
+// "to review this, read <lesson>, pp. X–Y of the <book>". Precomputed by the sync job
+// (npm run curriculum:sync — scripts/curriculum/, which vector-searches the Qdrant collection
+// `pdf_knowledge_base` directly + an LLM distillation pass) and stored here so the running service
+// has NO runtime dependency on Qdrant. Attached at both experiment and step level; the
+// step-level ref (when present) is preferred over the experiment-level one. These are
+// "go read the book" pointers, not answers — but they are still withheld from the pre-start
+// experiment payload (see the exclusion selects in experiment.controller.js /
+// session.controller.js) and surfaced only through the hint ladder and the session report.
+const curriculumRefSchema = new mongoose.Schema(
+  {
+    bookTitle: { type: String, default: "" }, // e.g. "Grade 10 Science Textbook"
+    bookFilename: { type: String, default: "" }, // Qdrant/`jobs` key, e.g. "grade-10-science-text-book-v1.pdf"
+    grade: { type: Number, default: null }, // 10 | 11
+    lessonTitle: { type: String, default: "" }, // e.g. "Acids, Bases and Salts"
+    sectionTitle: { type: String, default: "" }, // optional sub-heading within the lesson
+    pageStart: { type: Number, default: null },
+    pageEnd: { type: Number, default: null },
+    confidence: { type: Number, default: 0 }, // 0..1, from the generator's LLM pass
+    snippet: { type: String, default: "" }, // short grounding excerpt (not shown raw to the student)
+    sourceChunkIds: [{ type: String }], // Qdrant point ids used — for regeneration/audit
   },
   { _id: false }
 );
@@ -108,6 +148,10 @@ const stepSchema = new mongoose.Schema({
   // Full "no more hints, here's the answer" explanation — only ever sent to the client from
   // requestHelp, and only once the student has already been shown hint level 3 for this step.
   exactAnswer: { type: String, default: "" },
+  // Textbook lesson/page pointer(s) for THIS step (see curriculumRefSchema). Preferred over the
+  // experiment-level curriculumRefs when non-empty. Populated by the offline generator; withheld
+  // from the pre-start experiment payload, surfaced only via the hint ladder / session report.
+  curriculumRefs: [curriculumRefSchema],
   conceptTags: [{ type: mongoose.Schema.Types.ObjectId, ref: "Concept" }],
   misconceptionRisks: [{ type: String }], // misconception codes e.g. "PHY_001"
   timeLimit: { type: Number, default: 120 }, // seconds
@@ -168,6 +212,12 @@ const experimentSchema = new mongoose.Schema(
     // labRun.controller.js keys off requiresReactionCheck vs requiresMeasurementCheck and the
     // physics-only action types, not this field, so it can never desync grading behavior.
     evaluationEngine: { type: String, enum: ["chemistry_reaction", "mechanics", "circuit", null], default: null },
+
+    // Experiment-wide textbook lesson/page pointer(s) (see curriculumRefSchema) — the fallback
+    // when a step has no curriculumRefs of its own. Precomputed by
+    // npm run curriculum:sync; curriculumRefsGeneratedAt records the last sync run.
+    curriculumRefs: [curriculumRefSchema],
+    curriculumRefsGeneratedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

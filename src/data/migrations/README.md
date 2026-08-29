@@ -4,6 +4,24 @@ Additive, idempotent scripts that are safe to run against a live database. Unlik
 `src/data/seed.js` (which **deletes** every chemical / reaction / experiment before reseeding),
 nothing here drops or clears data.
 
+## `20260829-chemistry-appearance-and-observable-state.js`
+
+Materialises `Chemical.appearance` (the data-driven lab appearance — solutionColor / opacity /
+phase / texture, from `src/data/chemicalAppearance.js`) onto every chemical, and recomputes
+`LabRun.equipment[].observableState` for every **active** run so in-flight sessions immediately
+render correct liquid colours (indicator results included).
+
+```bash
+node src/data/migrations/20260829-chemistry-appearance-and-observable-state.js            # dry run
+node src/data/migrations/20260829-chemistry-appearance-and-observable-state.js --apply
+node src/data/migrations/20260829-chemistry-appearance-and-observable-state.js --apply --runs-only
+node src/data/migrations/20260829-chemistry-appearance-and-observable-state.js --apply --chemicals-only
+```
+
+Not needed right after a fresh `npm run seed` (the seed already writes `appearance`) — run it when
+a live DB has chemicals/runs that predate this feature. Never touches `Chemical.color`, `symbol`,
+reactions, practicals or sessions. No deletes.
+
 ## `20260827-first20-elements-and-artwork.js`
 
 Brings the Elements catalogue up to the full first 20 of the periodic table and attaches remote

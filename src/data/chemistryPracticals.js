@@ -10,7 +10,7 @@ const chemistryPracticals = [
     difficulty: "easy",
     estimatedTime: 25,
     description:
-      "Investigate the neutralization reaction between hydrochloric acid and sodium hydroxide, using an indicator to detect the reaction endpoint.",
+      "Investigate what happens when an acid and a base react, and find a way to detect the point at which the reaction is complete.",
     objectives: [
       "Understand what happens during an acid-base neutralization reaction",
       "Correctly use an indicator to detect a reaction endpoint",
@@ -31,9 +31,9 @@ const chemistryPracticals = [
     optionalEquipment: ["thermometer"],
     requiredChemicalSymbols: ["HCl", "NaOH", "Phph"],
     expectedObservations: [
-      "The indicator changes color as the solution approaches neutral",
-      "A slight temperature increase occurs (the reaction is exothermic)",
-      "The pH reading moves toward 7",
+      "The indicator changes colour as the reaction nears completion",
+      "The temperature of the mixture changes slightly during the reaction",
+      "The pH reading shifts as the reaction proceeds",
     ],
     safetyInformation: [
       "Wear safety goggles at all times",
@@ -47,8 +47,8 @@ const chemistryPracticals = [
     steps: [
       {
         stepId: 1,
-        title: "Measure Hydrochloric Acid",
-        instruction: "Use the measuring cylinder to measure 10ml of hydrochloric acid.",
+        title: "Prepare a Measured Amount of the Acid",
+        instruction: "Accurately measure out the volume of acid the procedure calls for.",
         expectedAction: "measure_hcl",
         actionType: "measure",
         requiredEquipment: ["measuring_cylinder"],
@@ -78,8 +78,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 2,
-        title: "Pour Acid into Beaker",
-        instruction: "Pour the measured hydrochloric acid into the beaker.",
+        title: "Set Up the Reaction Vessel",
+        instruction: "Move your measured acid into a suitable vessel for carrying out the reaction.",
         expectedAction: "pour_hcl_beaker",
         actionType: "pour",
         requiredEquipment: ["beaker"],
@@ -109,8 +109,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 3,
-        title: "Add Indicator",
-        instruction: "Add 2-3 drops of phenolphthalein indicator to the acid in the beaker.",
+        title: "Add a Way to Detect the Endpoint",
+        instruction: "Introduce something that will visually signal when the reaction reaches its endpoint.",
         expectedAction: "add_indicator",
         actionType: "add",
         requiredEquipment: ["dropper"],
@@ -140,8 +140,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 4,
-        title: "Add Sodium Hydroxide Gradually",
-        instruction: "Slowly add sodium hydroxide to the beaker while stirring, watching the indicator closely.",
+        title: "Carry Out the Neutralization",
+        instruction: "Gradually combine the two solutions while mixing, and watch closely for the endpoint signal.",
         expectedAction: "mix_hcl_naoh",
         actionType: "mix",
         requiredChemicalsForStepSymbols: ["HCl", "NaOH"],
@@ -180,8 +180,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 5,
-        title: "Observe and Record",
-        instruction: "Observe the color change and pH reading, and record your observations.",
+        title: "Determine the Endpoint",
+        instruction: "Observe the colour and the reading, and record what they tell you about the solution.",
         expectedAction: "observe_endpoint",
         actionType: "observe",
         requiredEquipment: ["ph_meter"],
@@ -215,7 +215,7 @@ const chemistryPracticals = [
     grades: [8, 9, 10],
     difficulty: "easy",
     estimatedTime: 20,
-    description: "Classify unknown solutions as acidic, basic, or neutral using a universal indicator and a pH meter.",
+    description: "Classify unknown solutions as acidic, basic, or neutral by choosing and applying appropriate chemical tests.",
     objectives: [
       "Classify solutions as acidic, basic, or neutral",
       "Correctly use an indicator and a pH meter to test substances",
@@ -236,9 +236,8 @@ const chemistryPracticals = [
     optionalEquipment: ["beaker"],
     requiredChemicalSymbols: ["HCl", "NaOH", "H2O", "UI"],
     expectedObservations: [
-      "The acid sample turns the indicator red/orange",
-      "The base sample turns the indicator purple/blue",
-      "The water sample stays green (neutral)",
+      "Different samples produce different indicator colours according to their nature",
+      "The pH meter gives a distinct numeric reading for each sample",
     ],
     safetyInformation: ["Wear safety goggles", "Do not taste any sample", "Use a fresh dropper for each substance to avoid contamination"],
     thumbnailColor: "#7CB342",
@@ -248,8 +247,8 @@ const chemistryPracticals = [
     steps: [
       {
         stepId: 1,
-        title: "Test the Acid Sample",
-        instruction: "Add a few drops of universal indicator to the hydrochloric acid sample and observe.",
+        title: "Investigate the First Sample",
+        instruction: "Test the first sample and determine whether it is acidic, basic, or neutral.",
         expectedAction: "test_acid",
         actionType: "add",
         requiredEquipment: ["dropper", "test_tube"],
@@ -300,8 +299,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 2,
-        title: "Test the Base Sample",
-        instruction: "Add a few drops of universal indicator to the sodium hydroxide sample and observe.",
+        title: "Investigate the Second Sample",
+        instruction: "Test the next sample the same way and compare how it responds.",
         expectedAction: "test_base",
         actionType: "add",
         requiredEquipment: ["dropper", "test_tube"],
@@ -340,8 +339,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 3,
-        title: "Test the Neutral Sample",
-        instruction: "Add a few drops of universal indicator to the water sample as a neutral reference.",
+        title: "Investigate the Reference Sample",
+        instruction: "Test your neutral reference sample so you have something to compare the others against.",
         expectedAction: "test_neutral",
         actionType: "add",
         requiredEquipment: ["dropper", "test_tube"],
@@ -380,8 +379,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 4,
-        title: "Record pH Readings",
-        instruction: "Use the pH meter to record an exact reading for each sample and classify it.",
+        title: "Measure and Classify Each Sample",
+        instruction: "Obtain a precise numeric reading for each sample and use it to classify them.",
         expectedAction: "record_ph_classification",
         actionType: "record",
         requiredEquipment: ["ph_meter"],
@@ -436,9 +435,9 @@ const chemistryPracticals = [
     optionalEquipment: ["stirrer"],
     requiredChemicalSymbols: ["Zn", "CuSO4"],
     expectedObservations: [
-      "The blue copper sulfate solution gradually fades toward colorless",
-      "A reddish-brown copper deposit forms on the zinc surface",
-      "The reaction is mildly exothermic",
+      "The colour of the solution gradually changes",
+      "A solid deposit forms on the surface of the metal",
+      "The temperature changes slightly during the reaction",
     ],
     safetyInformation: ["Wear safety goggles", "Copper sulfate is harmful if swallowed — wash hands after handling"],
     thumbnailColor: "#B87333",
@@ -448,8 +447,8 @@ const chemistryPracticals = [
     steps: [
       {
         stepId: 1,
-        title: "Measure the Zinc Sample",
-        instruction: "Use the balance to measure a small sample of zinc.",
+        title: "Prepare the Metal Sample",
+        instruction: "Measure out a small amount of the metal you will be testing.",
         expectedAction: "measure_zinc",
         actionType: "measure",
         requiredEquipment: ["balance"],
@@ -479,8 +478,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 2,
-        title: "Pour Copper Sulfate Solution",
-        instruction: "Pour copper sulfate solution into the test tube.",
+        title: "Set Up the Salt Solution",
+        instruction: "Add the metal salt solution to a suitable reaction container.",
         expectedAction: "pour_cuso4",
         actionType: "pour",
         requiredEquipment: ["test_tube"],
@@ -510,8 +509,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 3,
-        title: "Add Zinc to the Solution",
-        instruction: "Add the zinc sample to the copper sulfate solution.",
+        title: "Combine the Metal and the Solution",
+        instruction: "Introduce the metal to the salt solution and let any reaction take place.",
         expectedAction: "mix_zn_cuso4",
         actionType: "mix",
         requiredChemicalsForStepSymbols: ["Zn", "CuSO4"],
@@ -545,7 +544,7 @@ const chemistryPracticals = [
       {
         stepId: 4,
         title: "Observe the Reaction",
-        instruction: "Observe the color change in the solution and the deposit forming on the metal.",
+        instruction: "Observe and record any changes to the solution and to the metal.",
         expectedAction: "observe_displacement",
         actionType: "observe",
         requiredEquipment: ["test_tube"],
@@ -573,7 +572,7 @@ const chemistryPracticals = [
     grades: [9, 10, 11],
     difficulty: "medium",
     estimatedTime: 25,
-    description: "Generate carbon dioxide gas from a chemical reaction and use limewater to confirm its identity.",
+    description: "Generate a gas from a chemical reaction and use an appropriate chemical test to confirm its identity.",
     objectives: [
       "Generate a gas from a chemical reaction",
       "Use a standard gas test to identify carbon dioxide",
@@ -594,8 +593,8 @@ const chemistryPracticals = [
     optionalEquipment: [],
     requiredChemicalSymbols: ["HCl", "CaCO3", "Ca(OH)2"],
     expectedObservations: [
-      "Vigorous bubbling occurs as the acid reacts with the carbonate",
-      "The limewater turns milky/cloudy when the gas passes through it",
+      "Bubbling occurs as a gas is produced",
+      "The test solution changes appearance when the gas is passed through it",
     ],
     safetyInformation: ["Wear safety goggles", "Perform in a ventilated area", "Handle the acid with care — it is corrosive"],
     thumbnailColor: "#9E9E9E",
@@ -605,8 +604,8 @@ const chemistryPracticals = [
     steps: [
       {
         stepId: 1,
-        title: "Add Calcium Carbonate",
-        instruction: "Place a small amount of calcium carbonate into the test tube.",
+        title: "Prepare the Solid Reactant",
+        instruction: "Put a small amount of the solid reactant into a suitable reaction container.",
         expectedAction: "add_caco3",
         actionType: "add",
         requiredEquipment: ["test_tube"],
@@ -636,8 +635,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 2,
-        title: "Add Hydrochloric Acid",
-        instruction: "Pour hydrochloric acid onto the calcium carbonate.",
+        title: "Start the Gas-Producing Reaction",
+        instruction: "Add the liquid reactant to the solid and watch for a reaction.",
         expectedAction: "mix_hcl_caco3",
         actionType: "mix",
         requiredChemicalsForStepSymbols: ["HCl", "CaCO3"],
@@ -668,8 +667,8 @@ const chemistryPracticals = [
       },
       {
         stepId: 3,
-        title: "Test the Gas with Limewater",
-        instruction: "Direct the gas produced through limewater and observe any change.",
+        title: "Identify the Gas Produced",
+        instruction: "Use an appropriate chemical test to confirm the identity of the gas you produced.",
         expectedAction: "test_gas_limewater",
         actionType: "observe",
         requiredEquipment: ["beaker"],

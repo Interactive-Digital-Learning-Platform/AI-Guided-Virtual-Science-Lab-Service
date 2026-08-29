@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "seed": "node src/data/seed.js"
+    "seed": "node src/data/seed.js",
+    "curriculum:sync": "npm --prefix scripts/curriculum run sync --"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

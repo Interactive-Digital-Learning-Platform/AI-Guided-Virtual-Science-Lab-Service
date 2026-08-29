@@ -26,7 +26,17 @@ const chemicalSchema = new mongoose.Schema(
     isBuildableFromElements: { type: Boolean, default: false },
     buildReactionId: { type: mongoose.Schema.Types.ObjectId, ref: "Reaction", default: null },
     state: { type: String, enum: ["solid", "liquid", "gas", "aqueous"], required: true },
-    color: { type: String, default: "#FFFFFF" }, // hex, used for bottle/liquid tint in UI
+    color: { type: String, default: "#FFFFFF" }, // hex — CARD / bottle-tint artwork colour only
+    // How the substance actually LOOKS as the material in a vessel (test tube / beaker), as
+    // opposed to `color` above (illustrative card tint). Data-driven so UI components never pick
+    // a colour themselves — see src/data/chemicalAppearance.js (the source table, materialised
+    // here at seed time) and services/appearanceService.js (the reaction/indicator engine).
+    appearance: {
+      solutionColor: { type: String, default: null }, // hex the liquid fill renders as
+      opacity: { type: Number, default: null }, // 0..1 — colourless liquids stay low but > 0
+      phase: { type: String, default: null }, // solution | liquid | solid | gas | powder | crystals | metal
+      texture: { type: String, default: null }, // clear | cloudy | opaque | metallic | granular
+    },
     concentration: { type: String, default: null }, // e.g. "1M", "dilute", "concentrated"
     // Curated only for liquid/aqueous chemicals where pH is meaningful — see phService.js, which
     // falls back to a category-based estimate when this is unset. Null for solids/gases/elements.

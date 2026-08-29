@@ -1,17 +1,38 @@
 const LabRun = require("../models/LabRun");
 const Chemical = require("../models/Chemical");
 const Session = require("../models/Session");
+const Action = require("../models/Action");
 const { findReaction, serializeReactionMatch } = require("../services/reactionEngine");
 const { generateTutorResponse } = require("../services/labTutorService");
 const { generateInterventionHint } = require("../services/labHintService");
 const { computeContainerPh } = require("../services/phService");
+const { computeObservableState, observableStateChanged } = require("../services/appearanceService");
 const { computePendulumPeriod, computeSpringConstant } = require("../services/mechanicsEngine");
 const { computeMeterReading } = require("../services/circuitEngine");
+const transferService = require("../services/liquidTransferService");
 const { circuitBoards, CIRCUIT_EQUIPMENT_ROLES } = require("../data/circuitBoards");
 const FREEFORM_EXPERIMENT_TITLE = "this virtual lab"; // no Experiment/Session title to reference outside a guided practical
 
 const MAX_TUTOR_HISTORY = 6; // turns kept in the doc; only the last few are sent as prompt context
 const RECENT_ACTIONS_FOR_TUTOR = 5;
+
+/**
+ * Builds the initial LabRun.materials inventory from a Session's confirmed chemical selection plus
+ * any compounds it has finished building — every entry flagged wasInitiallySelected: true. This
+ * is the ONLY place the initial selection feeds the physical inventory; add_material_to_lab grows
+ * it afterwards without ever writing back to the Session (see labMaterialSchema in LabRun.js).
+ * Returns [] for a session with no selection yet — the run just starts with an empty inventory
+ * and the student pulls everything from the in-lab Material Library.
+ */
+const seedMaterialsFromSession = async (sessionId) => {
+  const session = await Session.findById(sessionId).select("chemicalSelection.selected builtCompounds").lean();
+  if (!session) return [];
+  const ids = new Set((session.chemicalSelection?.selected || []).map((id) => id.toString()));
+  (session.builtCompounds || [])
+    .filter((b) => b.completedAt)
+    .forEach((b) => ids.add(b.chemical.toString()));
+  return [...ids].map((chemical) => ({ chemical, wasInitiallySelected: true, addedAt: new Date() }));
+};
 
 /**
  * Checks an equipment instance's current contents against the reaction engine every time they
@@ -42,7 +63,37 @@ const checkAndApplyReaction = async (labRun, instance) => {
     mass: i === 0 ? totalMass : null,
   }));
 
+  // Energy change is an observable too (spec §9/§22) — nudge the container's temperature so the
+  // pH-meter/thermometer reads it and the bench can flag "the flask feels warm". Capped so an
+  // exothermic reaction reads as "warm", never "boiling", and never cools below room temp.
+  const energy = result.reaction.observableChanges?.energyChange;
+  if (!instance.isHeated) {
+    if (energy === "exothermic" || result.reaction.observableChanges?.heatProduced) {
+      instance.temperature = Math.min(55, Math.max(instance.temperature ?? 25, 25) + 12);
+    } else if (energy === "endothermic") {
+      instance.temperature = Math.max(6, Math.min(instance.temperature ?? 25, 25) - 8);
+    }
+  }
+
   return serializeReactionMatch(result.reaction);
+};
+
+/**
+ * Recomputes and persists a container instance's observable appearance whenever its contents
+ * change (add_chemical / pour / dispense / heat / reset / mix). The backend stays authoritative
+ * for what the liquid looks like (spec §6/§12) — the mobile client renders
+ * instance.observableState as-is, and animates the transition when lastChangedAt moves.
+ * `reaction` is the serialized reaction that just fired on this instance, or null.
+ */
+const refreshObservableState = async (instance, reaction = null) => {
+  if (!instance || !Array.isArray(instance.contents)) return;
+  const ids = instance.contents.map((c) => c.chemical).filter(Boolean);
+  const docs = ids.length ? await Chemical.find({ _id: { $in: ids } }).lean() : [];
+  const chemicalsById = Object.fromEntries(docs.map((d) => [d._id.toString(), d]));
+  const previous = instance.observableState?.toObject?.() ?? instance.observableState ?? null;
+  const next = computeObservableState({ contents: instance.contents, chemicalsById, reaction, previous });
+  next.lastChangedAt = observableStateChanged(previous, next) ? new Date() : previous?.lastChangedAt ?? null;
+  instance.observableState = next;
 };
 
 /**
@@ -63,7 +114,7 @@ const checkSafetyIntervention = async ({ actionType, instance, reactionResult, e
   }
 
   if (
-    (actionType === "add_chemical" || actionType === "pour") &&
+    (actionType === "add_chemical" || actionType === "pour" || actionType === "dispense") &&
     reactionResult &&
     !reactionResult.found &&
     reactionResult.reason === "no_known_reaction"
@@ -93,10 +144,25 @@ const startLabRun = async (req, res, next) => {
     const existing = await LabRun.findOne(filter);
     if (existing) {
       if (sessionId) await Session.findByIdAndUpdate(sessionId, { labRunId: existing._id });
+      // Backfill the material inventory for a run created before this feature existed (or before
+      // the student had confirmed a selection) — additive, never clears anything already there.
+      if (sessionId && (existing.materials || []).length === 0) {
+        const seeded = await seedMaterialsFromSession(sessionId);
+        if (seeded.length) {
+          existing.materials = seeded;
+          await existing.save();
+        }
+      }
       return res.status(200).json({ success: true, message: "Resuming active lab run.", data: existing });
     }
 
-    const labRun = await LabRun.create({ userId: req.user._id, sessionId: sessionId || null });
+    const labRun = await LabRun.create({
+      userId: req.user._id,
+      sessionId: sessionId || null,
+      // Seed the physical lab inventory from the student's confirmed initial plan (Session stays
+      // the untouched record of that plan). Empty for a freeform run with no session.
+      materials: sessionId ? await seedMaterialsFromSession(sessionId) : [],
+    });
     // Link back from the Session so session.controller.js's mix-step grading (Phase 4) can find
     // this run's live bench state without the client having to pass it separately.
     if (sessionId) await Session.findByIdAndUpdate(sessionId, { labRunId: labRun._id });
@@ -148,6 +214,7 @@ const logLabAction = async (req, res, next) => {
       instanceId,
       equipmentType,
       position,
+      capacity, // create_equipment (containers) — student-chosen vessel size in mL
       chemicalId,
       quantity,
       unit,
@@ -176,6 +243,10 @@ const logLabAction = async (req, res, next) => {
     // pushed at the end of this function reads these instead of the raw request fields.
     let resultQuantity = quantity;
     let resultUnit = unit;
+    // Liquid-transfer actions fill these in; every other action leaves them null.
+    let actionSourceInstanceId = null;
+    let actionTargetInstanceId = null;
+    let actionChemicalIds = null;
 
     switch (actionType) {
       case "create_equipment": {
@@ -203,6 +274,7 @@ const logLabAction = async (req, res, next) => {
             contents: [],
             temperature: 25,
             isHeated: false,
+            capacity: typeof capacity === "number" && capacity > 0 ? capacity : null,
           });
         }
         actionEquipmentLabel = equipmentType;
@@ -232,6 +304,13 @@ const logLabAction = async (req, res, next) => {
           volume: unit === "g" ? null : quantity ?? null,
           mass: unit === "g" ? quantity ?? null : null,
         });
+        // Keep the material inventory a true superset of everything that's touched the bench —
+        // if this chemical reached a container without going through the Material Library
+        // (freeform run, legacy flow), register it now so telemetry/"On Hand" stay accurate.
+        labRun.materials = labRun.materials || [];
+        if (labRun.sessionId && !labRun.materials.some((m) => m.chemical.toString() === chemicalId.toString())) {
+          labRun.materials.push({ chemical: chemicalId, wasInitiallySelected: false, addedAt: new Date() });
+        }
         reactionResult = await checkAndApplyReaction(labRun, instance);
         intervention = await checkSafetyIntervention({
           actionType,
@@ -239,6 +318,7 @@ const logLabAction = async (req, res, next) => {
           reactionResult,
           experimentTitle: FREEFORM_EXPERIMENT_TITLE,
         });
+        await refreshObservableState(instance, reactionResult?.found ? reactionResult : null);
         break;
       }
 
@@ -264,12 +344,15 @@ const logLabAction = async (req, res, next) => {
           reactionResult,
           experimentTitle: FREEFORM_EXPERIMENT_TITLE,
         });
+        await refreshObservableState(pourTarget, reactionResult?.found ? reactionResult : null);
+        await refreshObservableState(instance); // source is now empty
         break;
       }
 
       case "reset": {
         if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
         instance.contents = [];
+        await refreshObservableState(instance);
         break;
       }
 
@@ -285,6 +368,7 @@ const logLabAction = async (req, res, next) => {
           reactionResult,
           experimentTitle: FREEFORM_EXPERIMENT_TITLE,
         });
+        await refreshObservableState(instance, reactionResult?.found ? reactionResult : null);
         break;
       }
 
@@ -313,6 +397,136 @@ const logLabAction = async (req, res, next) => {
         if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
         instance.probeTargetId = null;
         instance.lastMeasurement = null;
+        break;
+      }
+
+      // --- Liquid-transfer instruments (dropper first) — see liquidTransferService.js ------------
+      case "insert_transfer_tool": {
+        if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (!transferService.isTransferInstrument(instance.equipmentType)) {
+          return res.status(400).json({ success: false, message: "This equipment isn't a transfer instrument." });
+        }
+        if (!targetInstanceId) return res.status(400).json({ success: false, message: "targetInstanceId is required." });
+        const container = labRun.equipment.find((e) => e.instanceId === targetInstanceId);
+        if (!container) return res.status(404).json({ success: false, message: "Target equipment not found." });
+
+        const r = await transferService.insertTransferTool({
+          instrument: instance,
+          target: container,
+          experimentTitle: FREEFORM_EXPERIMENT_TITLE,
+        });
+        if (r.error) return res.status(400).json({ success: false, message: r.error });
+        intervention = r.intervention || null;
+        actionSourceInstanceId = instance.transfer.status === "positioned_in_source" ? targetInstanceId : null;
+        actionTargetInstanceId = instance.transfer.status === "positioned_over_target" ? targetInstanceId : null;
+        break;
+      }
+
+      case "load_transfer_tool": {
+        if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        if (!chemicalId) return res.status(400).json({ success: false, message: "chemicalId is required." });
+        const lr = await transferService.loadFromReagent({
+          instrument: instance,
+          chemicalId,
+          experimentTitle: FREEFORM_EXPERIMENT_TITLE,
+        });
+        if (lr.error) return res.status(400).json({ success: false, message: lr.error });
+        intervention = lr.intervention || null;
+        actionChemicalIds = [chemicalId];
+        resultQuantity = instance.transfer.contents[0]?.volume ?? null;
+        resultUnit = "mL";
+        break;
+      }
+
+      case "aspirate": {
+        if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        const pre = await transferService.aspirate({ instrument: instance });
+        if (pre.error) return res.status(400).json({ success: false, message: pre.error });
+        const source = labRun.equipment.find((e) => e.instanceId === instance.transfer.sourceInstanceId);
+        if (!source) return res.status(404).json({ success: false, message: "Source container not found." });
+        const r = await transferService.applyAspirate({
+          instrument: instance,
+          source,
+          experimentTitle: FREEFORM_EXPERIMENT_TITLE,
+        });
+        if (r.error) return res.status(400).json({ success: false, message: r.error });
+        intervention = r.intervention || null;
+        actionSourceInstanceId = source.instanceId;
+        actionChemicalIds = instance.transfer.contents.map((c) => c.chemical);
+        resultQuantity = instance.transfer.contents[0]?.volume ?? null;
+        resultUnit = "mL";
+        break;
+      }
+
+      case "dispense": {
+        if (!instance) return res.status(404).json({ success: false, message: "Equipment instance not found." });
+        const targetId = targetInstanceId || instance.transfer?.targetInstanceId;
+        const container = targetId ? labRun.equipment.find((e) => e.instanceId === targetId) : null;
+        if (!container) return res.status(404).json({ success: false, message: "Target equipment not found." });
+
+        const r = await transferService.dispense({
+          instrument: instance,
+          target: container,
+          experimentTitle: FREEFORM_EXPERIMENT_TITLE,
+        });
+        if (r.error) return res.status(400).json({ success: false, message: r.error });
+
+        reactionResult = await checkAndApplyReaction(labRun, container);
+        intervention =
+          r.intervention ||
+          (await checkSafetyIntervention({
+            actionType,
+            instance: container,
+            reactionResult,
+            experimentTitle: FREEFORM_EXPERIMENT_TITLE,
+          }));
+        await refreshObservableState(container, reactionResult?.found ? reactionResult : null);
+        actionSourceInstanceId = instance.transfer?.lastSourceInstanceId || null;
+        actionTargetInstanceId = container.instanceId;
+        actionChemicalIds = r.dispensedChemicalId ? [r.dispensedChemicalId] : [];
+        resultQuantity = transferService.TRANSFER_INSTRUMENTS[instance.equipmentType]?.drop ?? null;
+        resultUnit = "mL";
+        break;
+      }
+
+      case "add_material_to_lab": {
+        // Non-blocking selection: the student realised mid-experiment they need another chemical
+        // and pulled it from the in-lab Material Library. Adds to the physical inventory only —
+        // never writes back to Session.chemicalSelection (that stays the record of the initial
+        // plan). Grading always reads the live bench, so this is what lets an initial planning
+        // mistake stop being a permanent task failure.
+        if (!chemicalId) return res.status(400).json({ success: false, message: "chemicalId is required." });
+        const material = await Chemical.findById(chemicalId).select("_id name").lean();
+        if (!material) return res.status(404).json({ success: false, message: "That material isn't in the chemistry catalog." });
+
+        labRun.materials = labRun.materials || [];
+        if (!labRun.materials.some((m) => m.chemical.toString() === chemicalId.toString())) {
+          const session = labRun.sessionId
+            ? await Session.findById(labRun.sessionId).select("chemicalSelection.selected currentStep currentMicroStep").lean()
+            : null;
+          const wasInitiallySelected = !!session?.chemicalSelection?.selected?.some(
+            (id) => id.toString() === chemicalId.toString()
+          );
+          // Did a missing-material hint already fire for the current task? (see requestHint's
+          // actionDetail). Behavioural telemetry only — never gates or reveals anything.
+          const hintPrecededAddition = session
+            ? !!(await Action.exists({
+                sessionId: session._id,
+                stepId: session.currentStep,
+                actionType: "hint_requested",
+                actionDetail: { $regex: "missing_material" },
+              }))
+            : false;
+          labRun.materials.push({
+            chemical: chemicalId,
+            wasInitiallySelected,
+            addedAt: new Date(),
+            addedDuringStep: session?.currentStep ?? null,
+            addedDuringMicroStep: session?.currentMicroStep ?? null,
+            hintPrecededAddition,
+          });
+        }
+        actionChemicalIds = [chemicalId];
         break;
       }
 
@@ -512,10 +726,12 @@ const logLabAction = async (req, res, next) => {
     labRun.actions.push({
       actionType,
       equipment: actionEquipmentLabel,
-      chemicalIds: chemicalId ? [chemicalId] : [],
+      chemicalIds: actionChemicalIds ?? (chemicalId ? [chemicalId] : []),
       quantity: resultQuantity ?? null,
       unit: resultUnit || null,
       temperature: temperature ?? null,
+      sourceInstanceId: actionSourceInstanceId,
+      targetInstanceId: actionTargetInstanceId,
       reactionId: reactionResult?.found ? reactionResult.reaction.id : null,
       resultType: reactionResult ? (reactionResult.found ? "reaction_success" : "no_reaction") : null,
     });
@@ -565,6 +781,8 @@ const mixChemicals = async (req, res, next) => {
       instance.contents = result.reaction.products.map((p) => ({ chemical: p.chemical._id, volume: null, mass: null }));
       if (conditions.temperature != null) instance.temperature = conditions.temperature;
     }
+
+    await refreshObservableState(instance, result.found ? serializeReactionMatch(result.reaction) : null);
 
     await labRun.save();
 
