@@ -628,9 +628,12 @@ const logAction = async (req, res, next) => {
     let measurementResult = null;
     let mismatchKind = null;
     let benchEquipmentTypes = [];
+    // Hoisted to function scope: the proactive-intervention block below (outside this `if (step)`)
+    // reads evalResult.materialsInInventoryOk. Left block-scoped, that path threw a ReferenceError.
+    let evalResult = null;
 
     if (step) {
-      const evalResult = await evaluateOnBench({ equipment: target.equipment, chemicals: target.chemicals }, session.labRunId);
+      evalResult = await evaluateOnBench({ equipment: target.equipment, chemicals: target.chemicals }, session.labRunId);
       benchEquipmentTypes = evalResult.benchEquipmentTypes;
 
       if (!evalResult.equipmentOk) {
