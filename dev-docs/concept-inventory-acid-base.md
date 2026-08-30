@@ -427,9 +427,18 @@ sessionId,label_CHEM_001,label_CHEM_002,label_CHEM_003,label_CHEM_004
 ...
 ```
 
-Build this by: score each response sheet (§7.2) → look up `participantCode → sessionId` in the
-researcher's separate list → write one row per participant. (Use the **pre-test** flags for the
-primary Study 1 run; keep a second `labels-post.csv` from the post-test.)
+Build this with **`scripts/analysis/score-inventory.js`** — it applies the §6 key and the §7.2
+rules deterministically (no hand-scoring):
+
+```
+responses.csv   participantCode,form,item1_answer,item1_reason, … ,item15_answer,item15_reason
+map.csv         participantCode,sessionId
+node scripts/analysis/score-inventory.js responses.csv --form A --sessions map.csv -o labels.csv
+```
+
+Score Form A and Form B separately (`--form A` / `--form B`) into `labels-pre.csv` and
+`labels-post.csv`; the primary Study 1 run uses the pre-test flags. `--item-stats` prints the
+difficulty / discrimination numbers for the §8 checklist.
 
 ## 8. Before the main study — validity & reliability checklist
 
