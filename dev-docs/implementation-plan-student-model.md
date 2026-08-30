@@ -1,7 +1,8 @@
 # Implementation Plan — Bayesian Misconception Student Model
 
-Status: **M0–M6 complete (code side pilot-ready, shipped behind flags, 75 tests green).** Remaining:
-the two-tier concept inventory + ethics approval (workstream D), then run the studies. See §8b.
+Status: **M0–M6 complete (code side pilot-ready, shipped behind flags, 75 tests green).**
+Workstream D: the two-tier concept inventory is **drafted** ([concept-inventory-acid-base.md](./concept-inventory-acid-base.md)) —
+needs expert review + a validity pilot. Then: ethics approval, shadow-mode pilot, run the studies. See §8b.
 Companion to: [research-direction.md](./research-direction.md) — read §2 (claim), §5 (method), §6 (codebase map) first.
 Scope: `AI-Guided-Virtual-Science-Lab-Service`. Mobile: one optional report-screen addition, noted at the end.
 
