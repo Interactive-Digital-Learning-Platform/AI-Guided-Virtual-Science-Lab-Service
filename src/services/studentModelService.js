@@ -157,6 +157,22 @@ function buildTaskTimeline({ experiment, session }) {
   return out.sort((a, b) => a.startedAt - b.startedAt);
 }
 
+// Attach the task each action was performed under (from the stepProgress timeline) as
+// _taskIntent / _taskStepId / _taskMicroStepId. Used by scripts/analysis/export-sessions so an
+// offline replay (fit-params) reproduces the live task attribution without the full experiment.
+function annotateActionsWithTask({ experiment, session, benchActions }) {
+  const timeline = buildTaskTimeline({ experiment: experiment || {}, session: session || {} });
+  const currentTask = {
+    stepId: session?.currentStep ?? null,
+    microStepId: session?.currentMicroStep ?? null,
+    expectedIntent: expectedIntentFor(experiment || {}, session?.currentStep, session?.currentMicroStep),
+  };
+  return (benchActions || []).map((a) => {
+    const t = taskForAction(a, { taskTimeline: timeline, currentTask });
+    return { ...a, _taskIntent: t.expectedIntent ?? null, _taskStepId: t.stepId ?? null, _taskMicroStepId: t.microStepId ?? null };
+  });
+}
+
 function expectedIntentFor(experiment, stepId, microStepId) {
   const step = (experiment.steps || []).find((s) => s.stepId === stepId) || null;
   if (!step) return null;
@@ -165,6 +181,11 @@ function expectedIntentFor(experiment, stepId, microStepId) {
 }
 
 function taskForAction(action, { taskTimeline, currentTask }) {
+  // Pre-attributed action (see annotateActionsWithTask) — used by the offline analysis replay so it
+  // gets the same task attribution as the live path without the full experiment/session.
+  if (Object.prototype.hasOwnProperty.call(action, "_taskIntent")) {
+    return { stepId: action._taskStepId ?? null, microStepId: action._taskMicroStepId ?? null, expectedIntent: action._taskIntent };
+  }
   if (!taskTimeline || !taskTimeline.length || !action.timestamp) return currentTask;
   const t = new Date(action.timestamp).getTime();
   const containing = taskTimeline.find((w) => t >= w.startedAt && t <= w.completedAt);
@@ -273,6 +294,9 @@ function computeSubGoal({ experiment, session, benchActions }) {
  * @param chemicalsById     optional { [id]: { symbol, category, formula, ... } } — enables the
  *                          category-aware predicates; without it they simply never fire
  * @param taskTimeline      optional precomputed timeline (else derived from session.stepProgress)
+ * @param paramOverrides    optional { priors: {[code]: logOdds}, llr: {[predicate]: number} } —
+ *                          used only by scripts/analysis/fit-params.js to try alternative
+ *                          parameters against labelled data without editing the KB
  * @returns the Session.studentModel sub-doc shape (not persisted)
  */
 function computeStudentModel({
@@ -282,6 +306,7 @@ function computeStudentModel({
   signaturesByCode = {},
   chemicalsById = null,
   taskTimeline = null,
+  paramOverrides = null,
 }) {
   const relevantCodes = resolveRelevantCodes(experiment || {}, signaturesByCode);
   const timeline = taskTimeline || buildTaskTimeline({ experiment: experiment || {}, session: session || {} });
@@ -290,11 +315,14 @@ function computeStudentModel({
     microStepId: session?.currentMicroStep ?? null,
     expectedIntent: expectedIntentFor(experiment || {}, session?.currentStep, session?.currentMicroStep),
   };
+  const priorOverride = paramOverrides?.priors || {};
+  const llrOverride = paramOverrides?.llr || {};
 
   const state = {};
   for (const code of relevantCodes) {
-    const prior = (signaturesByCode[code] || {}).behaviouralPriorLogOdds;
-    state[code] = { logOdds: prior == null ? DEFAULT_PRIOR_LOG_ODDS : prior, evidence: [], matchCounts: {} };
+    const authoredPrior = (signaturesByCode[code] || {}).behaviouralPriorLogOdds;
+    const prior = priorOverride[code] ?? (authoredPrior == null ? DEFAULT_PRIOR_LOG_ODDS : authoredPrior);
+    state[code] = { logOdds: prior, evidence: [], matchCounts: {} };
   }
 
   const bench = newBenchState();
@@ -328,7 +356,8 @@ function computeStudentModel({
         if (!matched) continue;
 
         const n = (state[code].matchCounts[sig.predicate] = (state[code].matchCounts[sig.predicate] || 0) + 1);
-        const delta = (sig.logLikelihoodRatio || 1.0) / n; // damped repeat
+        const baseLlr = llrOverride[sig.predicate] ?? (sig.logLikelihoodRatio || 1.0);
+        const delta = baseLlr / n; // damped repeat
         state[code].logOdds = clampN(state[code].logOdds + delta, -LOG_ODDS_CLAMP, LOG_ODDS_CLAMP);
         if (state[code].evidence.length < MAX_EVIDENCE_PER_CODE) {
           state[code].evidence.push({
@@ -417,6 +446,7 @@ module.exports = {
   diagnose,
   shouldIntervene,
   buildTaskTimeline,
+  annotateActionsWithTask,
   PREDICATES,
   DEFAULT_PRIOR_LOG_ODDS,
   DIAGNOSE_THRESHOLD,

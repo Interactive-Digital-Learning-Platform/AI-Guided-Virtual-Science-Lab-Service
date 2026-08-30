@@ -299,6 +299,23 @@ test("no task timeline — actions are judged against the session's current task
   assert.ok(P(model, "CHEM_002") >= 0.6, `got ${P(model, "CHEM_002")}`);
 });
 
+test("annotateActionsWithTask + _taskIntent short-circuit — offline replay reproduces attribution", () => {
+  const scn = buildScenario({
+    relevantCodes: ["CHEM_002"],
+    phases: [
+      { intent: "SELECT_CONTAINER", actions: [{ actionType: "create_equipment", equipment: "beaker" }] },
+      { intent: "ADD_REAGENT", actions: [{ actionType: "heat", equipment: "beaker" }, { actionType: "heat", equipment: "beaker" }] },
+    ],
+  });
+  const annotated = svc.annotateActionsWithTask({ experiment: scn.experiment, session: scn.session, benchActions: scn.benchActions });
+  assert.deepEqual(annotated.map((a) => a._taskIntent), ["SELECT_CONTAINER", "ADD_REAGENT", "ADD_REAGENT"]);
+
+  // Replaying the annotated actions with NO stepProgress timeline still attributes correctly.
+  const stripped = { ...scn.session, stepProgress: [] };
+  const model = svc.computeStudentModel({ experiment: { ...scn.experiment, steps: [{ stepId: 1, misconceptionRisks: ["CHEM_002"], microSteps: [] }] }, session: stripped, benchActions: annotated, signaturesByCode });
+  assert.ok(P(model, "CHEM_002") >= 0.6, `got ${P(model, "CHEM_002")}`);
+});
+
 test("buildTaskTimeline — ordered windows with expectedIntent from the practical", () => {
   const scn = buildScenario({
     relevantCodes: ["CHEM_002"],
