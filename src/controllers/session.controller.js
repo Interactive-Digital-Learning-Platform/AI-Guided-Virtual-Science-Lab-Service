@@ -8,6 +8,7 @@ const Reaction = require("../models/Reaction");
 const LabRun = require("../models/LabRun");
 const { analyzeSession } = require("../services/aiService");
 const { generateFeedback } = require("../services/feedbackService");
+const scoring = require("../services/labScoringService");
 const { resolvePhysicsMeasurement: resolveMechanicsMeasurement, checkMeasurementTolerance } = require("../services/mechanicsEngine");
 const { resolvePhysicsMeasurement: resolveCircuitMeasurement, evaluateBoard } = require("../services/circuitEngine");
 
@@ -134,17 +135,96 @@ const resolveGradingTarget = (step, session) => {
   };
 };
 
-// Flat deduction table keyed off the highest level of help this step needed — a student who
-// solves a step with no hints scores 100; using the Help reveal always scores 75 regardless of
-// how many hints preceded it (Help is a single terminal deduction, not stacked on top of the
-// hint-level deductions), per the product's fixed scoring rule. Equipment/chemical mistake counts
-// no longer factor in directly — they're what drives highestHintLevel up in the first place (see
-// logAction's autoHintLevel), so they're already reflected here.
-const HINT_LEVEL_PENALTY = { 0: 0, 1: 5, 2: 10, 3: 15 };
-const computeStepScore = (stepEntry) => {
-  if (stepEntry.helpUsed) return 75;
-  const penalty = HINT_LEVEL_PENALTY[stepEntry.highestHintLevel] ?? 15;
-  return 100 - penalty;
+// Per-task / per-step performance score — CUMULATIVE guidance penalties: reaching hint level 3
+// means hints 1+2+3 were all shown (-1, -2, -3 = -6), and Help stacks a further -5 ON TOP (never
+// replaces the hint penalties). All the maths lives in labScoringService so logAction,
+// completeSession and getSessionReport can never derive it three different ways.
+// Returns { base, hintPenalty, helpPenalty, score }.
+const computeTaskPerformance = (entry) => scoring.calculateTaskPerformanceScore(entry);
+
+// Called ONCE at completion. Walks Session.stepProgress against the (populated) Experiment,
+// recomputing every performance score from its recorded highestHintLevel/helpUsed (self-healing),
+// and computing the gentle time score from timeSpentSeconds vs the expected duration. Mutates the
+// stepProgress sub-docs in place and returns the session-level roll-up. Read endpoints never
+// re-run this — they just read the persisted numbers.
+const finalizeScoring = (session) => {
+  const experiment = session.experimentId;
+  const steps = experiment?.steps || [];
+  const stepCount = steps.length || session.stepProgress.length || 1;
+
+  const stepScores = [];
+  const stepTimeScores = [];
+  let totalHintPenalty = 0;
+  let totalHelpPenalty = 0;
+  let totalActiveTime = 0;
+
+  for (const sp of session.stepProgress) {
+    const expStep = steps.find((s) => s.stepId === sp.stepId) || null;
+    const migrated = (sp.microSteps || []).length > 0;
+
+    if (migrated) {
+      const expMicroSteps = expStep?.microSteps || [];
+      const taskScores = [];
+      const taskTimeScores = [];
+      let spHintPenalty = 0;
+      let spHelpPenalty = 0;
+
+      for (const mp of sp.microSteps) {
+        const perf = scoring.calculateTaskPerformanceScore(mp);
+        mp.taskScore = perf.score;
+        mp.hintPenalty = perf.hintPenalty;
+        mp.helpPenalty = perf.helpPenalty;
+        spHintPenalty += perf.hintPenalty;
+        spHelpPenalty += perf.helpPenalty;
+        taskScores.push(perf.score);
+
+        const expMs = expMicroSteps.find((m) => m.microStepId === mp.microStepId) || null;
+        const expectedSeconds = scoring.expectedTaskSeconds({
+          microStep: expMs,
+          step: expStep,
+          experiment,
+          stepCount,
+          stepMicroStepCount: expMicroSteps.length,
+        });
+        const done = !!mp.completedAt && mp.timeSpentSeconds > 0;
+        mp.expectedTimeSeconds = expectedSeconds;
+        mp.timeScore = done ? scoring.calculateTimeScore(mp.timeSpentSeconds, expectedSeconds) : null;
+        if (mp.timeScore != null) taskTimeScores.push(mp.timeScore);
+        if (done) totalActiveTime += mp.timeSpentSeconds;
+      }
+
+      sp.stepScore = taskScores.length ? Math.round(scoring.average(taskScores)) : 100;
+      sp.hintPenalty = spHintPenalty;
+      sp.helpPenalty = spHelpPenalty;
+      sp.timeScore = taskTimeScores.length ? Math.round(scoring.average(taskTimeScores)) : null;
+    } else {
+      const perf = scoring.calculateTaskPerformanceScore(sp);
+      sp.stepScore = perf.score;
+      sp.hintPenalty = perf.hintPenalty;
+      sp.helpPenalty = perf.helpPenalty;
+      const expectedSeconds = scoring.expectedStepSeconds({ step: expStep, experiment, stepCount });
+      const done = !!sp.completedAt && sp.timeSpentSeconds > 0;
+      sp.timeScore = done ? scoring.calculateTimeScore(sp.timeSpentSeconds, expectedSeconds) : null;
+      if (done) totalActiveTime += sp.timeSpentSeconds;
+    }
+
+    stepScores.push(sp.stepScore);
+    if (sp.timeScore != null) stepTimeScores.push(sp.timeScore);
+    totalHintPenalty += sp.hintPenalty || 0;
+    totalHelpPenalty += sp.helpPenalty || 0;
+  }
+
+  const performanceScore = stepScores.length ? Math.round(scoring.average(stepScores)) : 0;
+  const timeScore = stepTimeScores.length ? Math.round(scoring.average(stepTimeScores)) : null;
+
+  return {
+    performanceScore,
+    timeScore,
+    score: scoring.combineFinalScore(performanceScore, timeScore),
+    totalHintPenalty,
+    totalHelpPenalty,
+    totalActiveTime,
+  };
 };
 
 // Finds this step's stepProgress entry, creating it (with startedAt) on first touch.
@@ -693,7 +773,7 @@ const logAction = async (req, res, next) => {
     }
 
     // Behavioral tracking (Session.stepProgress) — mistakes/hints/timing feed both the automatic
-    // hint below and completeSession's scoring (computeStepScore). For a migrated step, this
+    // hint below and the scoring (labScoringService, finalised in completeSession). For a migrated step, this
     // tracks the *current Current Task* specifically (activeEntry = the nested microStep entry),
     // which is what makes hint level / mistake counts naturally reset the moment the task changes
     // — a brand new microStepId always starts its own entry at highestHintLevel 0. For an
@@ -732,21 +812,29 @@ const logAction = async (req, res, next) => {
       activeEntry.timeSpentSeconds = activeEntry.startedAt
         ? Math.round((activeEntry.completedAt.getTime() - activeEntry.startedAt.getTime()) / 1000)
         : timeTaken || 0;
-      if (target.usingMicroSteps) activeEntry.taskScore = computeStepScore(activeEntry);
-      else activeEntry.stepScore = computeStepScore(activeEntry);
+      // Live performance score + its breakdown (cumulative hint penalty + Help penalty). Time is
+      // NOT scored here — it's finalised once at completion (completeSession), so re-opening the
+      // report can never change it.
+      const perf = computeTaskPerformance(activeEntry);
+      activeEntry.hintPenalty = perf.hintPenalty;
+      activeEntry.helpPenalty = perf.helpPenalty;
+      if (target.usingMicroSteps) activeEntry.taskScore = perf.score;
+      else activeEntry.stepScore = perf.score;
     }
 
     // Roll the parent step's own completion/score up once its last Current Task is solved — the
-    // step's stepScore becomes the average of its tasks' scores, same "100 minus deductions"
-    // spirit as computeStepScore, just aggregated one level up.
+    // step's stepScore is the average of its tasks' performance scores; the step's penalty
+    // breakdown is the sum of its tasks'.
     if (target?.usingMicroSteps && isLastMicroStep && actionType === "correct" && stepEntry && !stepEntry.completedAt) {
       stepEntry.completedAt = new Date();
       stepEntry.timeSpentSeconds = stepEntry.startedAt
         ? Math.round((stepEntry.completedAt.getTime() - stepEntry.startedAt.getTime()) / 1000)
         : timeTaken || 0;
       stepEntry.stepScore = stepEntry.microSteps.length
-        ? Math.round(stepEntry.microSteps.reduce((sum, m) => sum + m.taskScore, 0) / stepEntry.microSteps.length)
+        ? Math.round(stepEntry.microSteps.reduce((sum, m) => sum + (m.taskScore ?? 100), 0) / stepEntry.microSteps.length)
         : 100;
+      stepEntry.hintPenalty = stepEntry.microSteps.reduce((sum, m) => sum + (m.hintPenalty || 0), 0);
+      stepEntry.helpPenalty = stepEntry.microSteps.reduce((sum, m) => sum + (m.helpPenalty || 0), 0);
     }
 
     // Advance session position — incorrect attempts (wrong equipment, wrong chemical, or an
@@ -904,18 +992,21 @@ const completeSession = async (req, res, next) => {
 
     const allActions = await Action.find({ sessionId: session._id }).lean();
 
-    // Score is the average of each step's stepScore (100 minus mistake/hint deductions, see
-    // computeStepScore) — a student who solves every step first-try with no hints scores 100; one
-    // who needed several wrong attempts and hints on the way to the same correct end state scores
-    // lower, per the "hints/mistakes affect performance score, but never block completion" design.
-    // Falls back to the old binary correct/totalSteps formula only if stepProgress is somehow empty
-    // (e.g. an experiment without step-level data) so this never divides by zero or breaks scoring.
+    // FINAL SCORE — computed once, here. performanceScore (cumulative guidance penalties, dominant
+    // 90%) + a gentle timeScore (10%, or neutral when no expected durations exist). All maths in
+    // labScoringService; getSessionReport only reads the persisted result, never recomputes.
     const totalSteps = session.experimentId.steps.length;
-    const score = session.stepProgress.length
-      ? Math.round(session.stepProgress.reduce((sum, sp) => sum + sp.stepScore, 0) / session.stepProgress.length)
-      : Math.round((allActions.filter((a) => a.actionType === "correct").length / totalSteps) * 100);
+    let finalScoring;
+    if (session.stepProgress.length) {
+      finalScoring = finalizeScoring(session);
+    } else {
+      // No step-level data at all (shouldn't happen for a real completed practical) — fall back to
+      // the old binary correct/totalSteps formula so this never divides by zero.
+      const perf = Math.round((allActions.filter((a) => a.actionType === "correct").length / totalSteps) * 100);
+      finalScoring = { performanceScore: perf, timeScore: null, score: perf, totalHintPenalty: 0, totalHelpPenalty: 0, totalActiveTime: 0 };
+    }
 
-    // Calculate total time
+    // Wall-clock session duration (reporting only — includes idle / app-backgrounded time).
     const totalTime = Math.round((Date.now() - session.startTime.getTime()) / 1000);
 
     // Calculate average step time
@@ -924,7 +1015,12 @@ const completeSession = async (req, res, next) => {
 
     session.status = "completed";
     session.endTime = new Date();
-    session.score = score;
+    session.score = finalScoring.score;
+    session.performanceScore = finalScoring.performanceScore;
+    session.timeScore = finalScoring.timeScore;
+    session.totalHintPenalty = finalScoring.totalHintPenalty;
+    session.totalHelpPenalty = finalScoring.totalHelpPenalty;
+    session.totalActiveTime = finalScoring.totalActiveTime;
     session.totalTime = totalTime;
     session.behaviorFeatures.averageStepTime = Math.round(avgStepTime);
     session.behaviorFeatures.errorRate =
@@ -952,7 +1048,14 @@ const completeSession = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: "Session completed. AI analysis done.",
-      data: { score, totalTime, feedback: session.aiFeedback },
+      data: {
+        score: finalScoring.score,
+        performanceScore: finalScoring.performanceScore,
+        timeScore: finalScoring.timeScore,
+        totalTime,
+        totalActiveTime: finalScoring.totalActiveTime,
+        feedback: session.aiFeedback,
+      },
     });
   } catch (error) {
     next(error);
@@ -968,8 +1071,17 @@ const getSessionReport = async (req, res, next) => {
       .populate("chemicalSelection.selected")
       .lean();
     if (!session) return res.status(404).json({ success: false, message: "Session not found." });
+    if (session.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: "This isn't your session." });
+    }
     if (session.status !== "completed") {
       return res.status(400).json({ success: false, message: "Report is available once the session is completed." });
+    }
+    // The practical was deleted / re-seeded since this session ran — the report can't be
+    // reconstructed without it. Return a clean 404 rather than throwing (the score itself is
+    // already frozen on the Session doc and stays intact).
+    if (!session.experimentId) {
+      return res.status(404).json({ success: false, message: "The practical for this session is no longer available." });
     }
 
     const experiment = session.experimentId;
@@ -985,8 +1097,18 @@ const getSessionReport = async (req, res, next) => {
       ).values(),
     ];
 
-    const proceduralErrors = actions.filter((a) => a.actionType === "incorrect" && (!a.conceptViolated || a.conceptViolated.startsWith("PROC")));
     const conceptualErrors = session.aiFeedback.misconceptionsDetected || [];
+
+    // Deterministic per-step performance breakdown + struggle ranking + guidance summary +
+    // student-readable procedural errors (reportAnalyticsService). No LLM — this is what the
+    // Report screen renders and what Phase 3's feedback model will be handed.
+    const { buildReportAnalytics } = require("../services/reportAnalyticsService");
+    const analytics = buildReportAnalytics({
+      session,
+      experiment,
+      actions,
+      misconceptions: conceptualErrors,
+    });
 
     // Research-facing per-Current-Task metrics (spec: microStepAttempts/microStepErrors/
     // hintsRequested/hintLevelReached/timePerMicroStep/retriesPerMicroStep) — sourced straight
@@ -1004,6 +1126,12 @@ const getSessionReport = async (req, res, next) => {
         solvedIndependently: mp.solvedIndependently,
         timeSpentSeconds: mp.timeSpentSeconds,
         taskScore: mp.taskScore,
+        // Score-breakdown for this task (see labScoringService): 100 − hintPenalty − helpPenalty
+        // = taskScore. timeScore/expectedTimeSeconds are null when time was neutral for this task.
+        hintPenalty: mp.hintPenalty ?? 0,
+        helpPenalty: mp.helpPenalty ?? 0,
+        timeScore: mp.timeScore ?? null,
+        expectedTimeSeconds: mp.expectedTimeSeconds ?? null,
       }))
     );
 
@@ -1036,9 +1164,13 @@ const getSessionReport = async (req, res, next) => {
         chemicalsUsed,
         procedureFollowed: experiment.steps.map((s) => ({ stepId: s.stepId, title: s.title, instruction: s.instruction })),
         microStepBreakdown,
+        // Phase-2 deterministic analytics (see reportAnalyticsService).
+        stepBreakdown: analytics.stepBreakdown,
+        mostStruggledSteps: analytics.mostStruggledSteps,
+        guidanceSummary: analytics.guidanceSummary,
         observations: experiment.expectedObservations || [],
         errorsDetected: {
-          procedural: proceduralErrors.map((a) => ({ stepId: a.stepId, detail: a.actionDetail })),
+          procedural: analytics.proceduralErrors, // now { stepId, stepTitle, message, count } — student-readable
           conceptual: conceptualErrors,
         },
         aiFeedback: session.aiFeedback,
@@ -1046,11 +1178,50 @@ const getSessionReport = async (req, res, next) => {
         practicalReference,
         followUpReading,
         finalUnderstandingAssessment: session.aiFeedback.finalUnderstandingAssessment || null,
+        // Final score + its components (all persisted at completion; never recomputed here).
+        //   score = round(performanceScore * 0.90 + timeScore * 0.10), or performanceScore alone
+        //   when timeScore is null (no expected durations configured for this practical).
         score: session.score,
-        totalTime: session.totalTime,
+        performanceScore: session.performanceScore ?? session.score,
+        timeScore: session.timeScore ?? null,
+        totalHintPenalty: session.totalHintPenalty ?? 0,
+        totalHelpPenalty: session.totalHelpPenalty ?? 0,
+        totalTime: session.totalTime, // wall-clock (includes idle)
+        totalActiveTime: session.totalActiveTime ?? 0, // summed active task time
         timestamp: session.updatedAt,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/sessions/:id/note-context
+// The Lab → Notes handoff (spec Phase 4). Returns a normalized, self-contained student-
+// performance context (no raw Action docs) that the Notes feature fetches by sessionId and turns
+// into a personalized revision note. The Lab does NOT generate the note — its job ends here.
+const getSessionNoteContext = async (req, res, next) => {
+  try {
+    const session = await Session.findById(req.params.id).populate("experimentId").lean();
+    if (!session) return res.status(404).json({ success: false, message: "Session not found." });
+    if (session.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: "This isn't your session." });
+    }
+    if (session.status !== "completed") {
+      return res.status(400).json({ success: false, message: "Available once the practical is completed." });
+    }
+
+    const experiment = session.experimentId || null;
+    const actions = await Action.find({ sessionId: session._id }).sort({ timestamp: 1 }).lean();
+    const { buildLabNoteContext } = require("../services/reportAnalyticsService");
+    const noteContext = buildLabNoteContext({
+      session,
+      experiment,
+      actions,
+      curriculumReference: practicalCurriculumReference(experiment),
+    });
+
+    res.status(200).json({ success: true, data: noteContext });
   } catch (error) {
     next(error);
   }
@@ -1383,8 +1554,9 @@ const requestHint = async (req, res, next) => {
 // The one place the correct answer is ever sent to the client — gated server-side (not just in
 // the UI) on the student already having been shown hint level 3 for the current Current Task
 // (or, for an unmigrated step, the step itself), same "backend is the source of truth" principle
-// as evaluateOnBench. Marks the active progress entry's helpUsed so computeStepScore applies the
-// fixed -25% deduction, and logs a help_used Action for analytics.
+// as evaluateOnBench. Marks the active progress entry's helpUsed so the scoring
+// (labScoringService) applies the -5 Help penalty ON TOP of the hint penalties, and logs a
+// help_used Action for analytics.
 const requestHelp = async (req, res, next) => {
   try {
     const { stepId } = req.body;
@@ -1483,6 +1655,7 @@ module.exports = {
   completeSession,
   getSession,
   getSessionReport,
+  getSessionNoteContext,
   getUserSessions,
   getSessionStats,
   requestHint,

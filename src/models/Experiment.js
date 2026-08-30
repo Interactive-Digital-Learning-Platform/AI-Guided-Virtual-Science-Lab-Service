@@ -83,6 +83,11 @@ const microStepSchema = new mongoose.Schema(
     // This task's own "no more hints, here's the answer" explanation — only ever sent to the
     // client from requestHelp, and only once hint level 3 has been shown for this task.
     exactAnswer: { type: String, default: "" },
+    // Optional author-set expected duration for this Current Task, in seconds — feeds the gentle
+    // time component of the score (labScoringService). null → the score derives an expected
+    // duration from the experiment's estimatedTime instead (migrated practicals only), so time
+    // scoring works out of the box and this field just refines it.
+    expectedTimeSeconds: { type: Number, default: null },
   },
   { _id: false }
 );
@@ -154,7 +159,11 @@ const stepSchema = new mongoose.Schema({
   curriculumRefs: [curriculumRefSchema],
   conceptTags: [{ type: mongoose.Schema.Types.ObjectId, ref: "Concept" }],
   misconceptionRisks: [{ type: String }], // misconception codes e.g. "PHY_001"
-  timeLimit: { type: Number, default: 120 }, // seconds
+  timeLimit: { type: Number, default: 120 }, // seconds — soft per-step limit (unused by scoring)
+  // Optional author-set expected duration for this whole Main Step, in seconds — feeds the gentle
+  // time component of the score (labScoringService). Used for UNMIGRATED steps (no microSteps),
+  // or as the split base for a migrated step's tasks. null → derived from experiment.estimatedTime.
+  expectedTimeSeconds: { type: Number, default: null },
   hints: [
     {
       level: { type: Number, min: 1, max: 3 },

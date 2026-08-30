@@ -30,4 +30,22 @@ const generateText = async (prompt) => {
   return (completion.choices[0]?.message?.content || "").trim();
 };
 
-module.exports = { isConfigured, generateText };
+/**
+ * Single-turn prompt expecting a JSON object back. Uses the API's json_object response format and
+ * parses the result. Throws on API failure OR unparseable output — callers fall back to their
+ * deterministic response, same contract as generateText.
+ */
+const generateJSON = async (prompt) => {
+  const groq = getClient();
+  const completion = await groq.chat.completions.create({
+    model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+  });
+  const raw = (completion.choices[0]?.message?.content || "").trim();
+  // Be tolerant of a stray ```json fence even with response_format set.
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  return JSON.parse(cleaned);
+};
+
+module.exports = { isConfigured, generateText, generateJSON };

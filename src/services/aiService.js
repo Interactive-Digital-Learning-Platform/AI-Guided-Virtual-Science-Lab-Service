@@ -10,7 +10,7 @@ const analyzeSession = async (session, actions) => {
   const suggestions = [];
 
   const features = session.behaviorFeatures;
-  const { generateFeedback } = require("./feedbackService");
+  const { generatePersonalizedFeedback } = require("./feedbackService");
 
   // ── Rule 1: High error rate → procedural confusion ──────────────────────
   if (features.errorRate > 0.4) {
@@ -86,28 +86,70 @@ const analyzeSession = async (session, actions) => {
   if (session.score >= 80) strengths.push("Strong overall performance on this experiment.");
   if (features.totalRetries === 0) strengths.push("You completed all steps correctly on the first attempt.");
 
-  // ── Generate natural language summary via Gemini ────────────────────────
-  let summary = "";
+  // ── Deterministic performance context (Phase 2 analytics) ───────────────
+  // Everything below is verified/pre-computed — this is exactly what the personalized-feedback
+  // LLM is handed (spec §18/§22: the model rephrases, it never derives numbers or rankings).
+  const { buildReportAnalytics, formatDuration } = require("./reportAnalyticsService");
+  const { practicalCurriculumReference } = require("./curriculumReferenceService");
+  const experiment = session.experimentId || null;
+  const analytics = buildReportAnalytics({
+    session,
+    experiment,
+    actions,
+    misconceptions: misconceptionsDetected,
+  });
+
+  const grade = experiment?.grades?.[0] || session.userId?.grade || 8;
+
+  const performanceContext = {
+    experiment: experiment?.title || "the practical",
+    subject: experiment?.subject || null,
+    finalScore: session.score,
+    performanceScore: session.performanceScore ?? session.score,
+    timeScore: session.timeScore ?? null, // null = time was not scored for this practical
+    totalActiveTime: formatDuration(session.totalActiveTime || 0),
+    totalSessionTime: formatDuration(session.totalTime || 0),
+    steps: analytics.stepBreakdown.map((b) => ({
+      step: `${b.stepId}. ${b.title}`,
+      score: b.score,
+      time: formatDuration(b.timeSpentSeconds),
+      hints: b.hintsRequested,
+      helpUsed: b.helpUsed,
+      retries: b.retries,
+      equipmentMistakes: b.equipmentMistakes,
+      chemicalMistakes: b.chemicalMistakes,
+      status: b.status,
+    })),
+    mostStruggledSteps: analytics.mostStruggledSteps.map((s) => ({ step: s.title, reasons: s.reasons })),
+    guidanceSummary: analytics.guidanceSummary,
+    proceduralErrors: analytics.proceduralErrors.map(
+      (e) => `${e.message} (step ${e.stepId}${e.count > 1 ? `, ${e.count} times` : ""})`
+    ),
+    misconceptions: misconceptionsDetected.map((m) => ({ concept: m.description, step: m.relatedStep, fix: m.correctionStrategy })),
+    detectedStrengths: strengths, // rule-based seeds; the LLM makes them specific
+    conceptsToImprove: [...conceptsToImprove],
+    understanding: buildFinalUnderstandingAssessment(session.score, misconceptionsDetected),
+    curriculumReference: (practicalCurriculumReference(experiment) || {}).displayText || null,
+  };
+
+  // ── Personalized, behaviour-aware feedback (structured) ─────────────────
+  let personalized;
   try {
-    summary = await generateFeedback({
-      experimentTitle: session.experimentId?.title || "the experiment",
-      score: session.score,
-      misconceptions: misconceptionsDetected,
-      strengths,
-      grade: session.userId?.grade || 8,
-    });
+    personalized = await generatePersonalizedFeedback({ performanceContext, grade });
   } catch {
-    // Fallback summary if Gemini fails
-    summary = buildFallbackSummary(session.score, misconceptionsDetected, strengths);
+    personalized = { summary: buildFallbackSummary(session.score, misconceptionsDetected, strengths), strengths, struggleAnalysis: [], recommendations: [] };
   }
 
   return {
-    summary,
+    summary: personalized.summary,
     misconceptionsDetected,
-    strengths,
-    suggestions,
+    // LLM-personalized where available, rule-based seeds otherwise.
+    strengths: personalized.strengths && personalized.strengths.length ? personalized.strengths : strengths,
+    struggleAnalysis: personalized.struggleAnalysis || [],
+    recommendations: personalized.recommendations || [],
+    suggestions, // rule-based, kept for back-compat / analytics
     conceptsToImprove: [...conceptsToImprove],
-    finalUnderstandingAssessment: buildFinalUnderstandingAssessment(session.score, misconceptionsDetected),
+    finalUnderstandingAssessment: performanceContext.understanding,
     feedbackGeneratedAt: new Date(),
   };
 };

@@ -21,18 +21,29 @@ const formatPages = (pageStart, pageEnd) => {
  * Formats one stored curriculumRef into the shape the mobile client renders.
  * Returns null if the ref has no usable page range.
  */
+// Some generated refs repeat the lesson title as the section title, or use a whole sentence as the
+// lesson title — normalise for display so it doesn't read as "X (X)".
+const cleanSection = (lessonTitle, sectionTitle) => {
+  if (!sectionTitle) return null;
+  const l = lessonTitle.trim().toLowerCase();
+  const s = sectionTitle.trim().toLowerCase();
+  if (s === l || l.includes(s) || s.includes(l)) return null;
+  return sectionTitle.trim();
+};
+
 const formatCurriculumReference = (ref) => {
   if (!ref) return null;
   const pages = formatPages(ref.pageStart, ref.pageEnd);
   if (!pages || !ref.lessonTitle) return null;
 
   const book = ref.bookTitle || "curriculum textbook";
-  const section = ref.sectionTitle ? ` (${ref.sectionTitle})` : "";
+  const sectionTitle = cleanSection(ref.lessonTitle, ref.sectionTitle);
+  const section = sectionTitle ? ` (${sectionTitle})` : "";
 
   return {
     bookTitle: ref.bookTitle || null,
     lessonTitle: ref.lessonTitle,
-    sectionTitle: ref.sectionTitle || null,
+    sectionTitle,
     pageStart: ref.pageStart || null,
     pageEnd: ref.pageEnd || ref.pageStart || null,
     displayText: `To get an idea about this, read "${ref.lessonTitle}"${section} on ${pages} of the ${book}.`,
@@ -72,11 +83,12 @@ const practicalCurriculumReference = (experiment) => {
   if (!pages || !best.lessonTitle) return null;
 
   const book = best.bookTitle || "curriculum textbook";
-  const section = best.sectionTitle ? ` — ${best.sectionTitle}` : "";
+  const sectionTitle = cleanSection(best.lessonTitle, best.sectionTitle);
+  const section = sectionTitle ? ` — ${sectionTitle}` : "";
   return {
     bookTitle: best.bookTitle || null,
     lessonTitle: best.lessonTitle,
-    sectionTitle: best.sectionTitle || null,
+    sectionTitle,
     pageStart: best.pageStart || null,
     pageEnd: best.pageEnd || best.pageStart || null,
     displayText: `This practical is covered by "${best.lessonTitle}"${section}, ${pages} of the ${book}.`,
