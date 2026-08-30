@@ -175,6 +175,48 @@ const sessionSchema = new mongoose.Schema(
         ],
       },
     ],
+
+    // ── Bayesian misconception student model (dev-docs/implementation-plan-student-model.md) ──
+    // Snapshot of the posterior over curriculum-specific misconceptions, recomputed by
+    // services/studentModelService.js from the bench action log and cached here for the report and
+    // for research export. Always recomputable — never the sole source of truth. Populated only
+    // when STUDENT_MODEL_ENABLED; empty/absent otherwise (the legacy rule path in
+    // aiService.analyzeSession is unchanged).
+    studentModel: {
+      cluster: { type: String, default: null }, // e.g. "acid_base"
+      misconceptions: [
+        {
+          code: { type: String },
+          priorLogOdds: { type: Number, default: 0 },
+          logOdds: { type: Number, default: 0 },
+          probability: { type: Number, default: 0.5 }, // sigmoid(logOdds), denormalised
+          evidence: [
+            {
+              actionIndex: { type: Number },
+              stepId: { type: Number, default: null },
+              microStepId: { type: Number, default: null },
+              predicate: { type: String },
+              deltaLogOdds: { type: Number },
+              at: { type: Date, default: null },
+            },
+          ],
+        },
+      ],
+      subGoal: {
+        nominalMicroStepId: { type: Number, default: null },
+        onTaskProbability: { type: Number, default: 1 },
+        divergenceFlag: { type: Boolean, default: false }, // M4
+      },
+      // Shadow-mode comparison: the codes aiService.analyzeSession's rules concluded, stored
+      // alongside the model's posterior so the analysis scripts can compare without re-running.
+      shadowRuleMisconceptions: [{ type: String }],
+      computedFromActionCount: { type: Number, default: 0 },
+      updatedAt: { type: Date, default: null },
+    },
+
+    // RCT arm — assigned once at startSession, stable per user (see config/featureFlags.js).
+    // "off" ⇒ the feature is disabled and the STUDENT_MODEL_DRIVES_* flags ignore this session.
+    experimentArm: { type: String, enum: ["treatment", "control", "off"], default: "off" },
   },
   { timestamps: true }
 );

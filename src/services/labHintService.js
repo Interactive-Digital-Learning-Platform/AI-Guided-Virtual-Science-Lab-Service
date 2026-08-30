@@ -94,6 +94,8 @@ const buildFallbackIntervention = (triggerType, context) => {
       return "That happened quickly — take a moment to observe what changed before moving on.";
     case "transfer_contamination":
       return `Using the same ${context?.instrument || "transfer tool"} in two different solutions can carry traces of the first into the second — think about whether that matters here.`;
+    case "off_task":
+      return "This looks like it belongs to a different part of the experiment — have a look at what the current task is actually asking for.";
     default:
       return "Pause for a moment and consider what you expect to happen next.";
   }
@@ -420,6 +422,56 @@ const buildFallbackCircuitHint = ({ level }) => {
   return byLevel[level] || byLevel[3];
 };
 
+/**
+ * Misconception-targeted hint (M5 — dev-docs/implementation-plan-student-model.md §3.5). The
+ * Bayesian student model has concluded the student probably holds `misconceptionDescription`;
+ * this gently makes them question that specific belief, without naming the equipment/chemical or
+ * giving the step away. Escalates over 3 levels. Falls back to one sentence of `correctionStrategy`
+ * when Groq is unavailable.
+ */
+const generateMisconceptionHint = async ({
+  experimentTitle,
+  studentPrompt,
+  misconceptionDescription,
+  correctionStrategy,
+  level = 1,
+  grade = 10,
+}) => {
+  const fallback = buildFallbackMisconceptionHint({ correctionStrategy, level });
+  if (!isConfigured()) return fallback;
+
+  const prompt = `
+You are a Sri Lankan O/L science teacher helping a Grade ${grade} student working ALONE in a
+virtual lab on "${experimentTitle || "this practical"}". Their current task: "${studentPrompt || "the current step"}".
+
+From how they have been using the equipment, they appear to hold this misconception:
+"${misconceptionDescription || "a misunderstanding about the science of this step"}"
+
+Write ONE short hint (max 30 words, hint level ${level} of 3) that gently makes them question that
+specific belief — WITHOUT naming the correct equipment or chemical, and without giving the step away.
+- Level 1: a reflective question about the underlying idea
+- Level 2: contrast the belief with what actually drives the result
+- Level 3: be near-explicit about the principle, but still not the exact action
+Do not use quotation marks. Do not use markdown or bullet characters.
+`;
+
+  try {
+    return await generateText(prompt);
+  } catch (error) {
+    console.error("Groq API error:", error.message);
+    return fallback;
+  }
+};
+
+const buildFallbackMisconceptionHint = ({ correctionStrategy, level }) => {
+  const clean = String(correctionStrategy || "Think about the science behind what this step is asking.")
+    .replace(/\s+/g, " ")
+    .trim();
+  const firstSentence = (clean.match(/^[^.!?]*[.!?]/) || [clean])[0].trim();
+  const prefix = level >= 3 ? "" : level === 2 ? "Consider this: " : "Think about this: ";
+  return `${prefix}${firstSentence}`;
+};
+
 module.exports = {
   generateSelectionHint,
   generateInterventionHint,
@@ -428,6 +480,7 @@ module.exports = {
   generateChemicalHint,
   generateTaskHint,
   generateCircuitHint,
+  generateMisconceptionHint,
   classifyCompoundBuildMistake,
   hintLevelForAttempts,
 };

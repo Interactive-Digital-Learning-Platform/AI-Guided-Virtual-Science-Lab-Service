@@ -62,6 +62,16 @@ const misconceptions = [
     feedbackTemplate: "In step {step}, the release angle looks larger than the small-angle range the formula assumes — try releasing from a smaller angle.",
     prevalenceGrades: [10, 11],
     detectionTriggers: ["release_angle_over_threshold"],
+    behaviouralPriorLogOdds: -0.8,
+    behaviouralSignatures: [
+      {
+        whenIntent: ["SET_MEASUREMENT_PARAMETER"],
+        predicate: "pendulum_release_angle_over_15deg",
+        evidenceType: "commission",
+        logLikelihoodRatio: 1.6,
+        source: "Small-angle approximation limit (~15°) for T = 2π√(L/g); standard simple-pendulum practical error.",
+      },
+    ],
     severity: "medium",
   },
   {
@@ -75,6 +85,16 @@ const misconceptions = [
     feedbackTemplate: "In step {step}, timing more oscillations before dividing would give a far more accurate period.",
     prevalenceGrades: [10, 11],
     detectionTriggers: ["oscillation_count_too_low"],
+    behaviouralPriorLogOdds: -0.8,
+    behaviouralSignatures: [
+      {
+        whenIntent: ["STOP_TIMED_TRIAL", "RECORD_RESULT"],
+        predicate: "timed_single_oscillation",
+        evidenceType: "commission",
+        logLikelihoodRatio: 1.5,
+        source: "Timing many oscillations averages out reaction-time error; standard pendulum-practical guidance.",
+      },
+    ],
     severity: "medium",
   },
   {
@@ -101,6 +121,16 @@ const misconceptions = [
     feedbackTemplate: "In step {step}, it looks like the total length was used instead of the extension — subtract the natural length first.",
     prevalenceGrades: [10, 11],
     detectionTriggers: ["spring_constant_out_of_tolerance"],
+    behaviouralPriorLogOdds: -0.9,
+    behaviouralSignatures: [
+      {
+        whenIntent: ["MEASURE_RESULT", "RECORD_RESULT"],
+        predicate: "reported_total_length_as_extension",
+        evidenceType: "commission",
+        logLikelihoodRatio: 1.4,
+        source: "Hooke's law: extension = stretched length − natural length; recording the stretched length itself is the classic slip.",
+      },
+    ],
     severity: "medium",
   },
   {
@@ -205,6 +235,16 @@ const misconceptions = [
     feedbackTemplate: "In step {step}, you added reagents in the wrong order. Order matters for both safety and accuracy!",
     prevalenceGrades: [9, 10, 11],
     detectionTriggers: ["wrong_addition_order", "skipped_indicator"],
+    behaviouralPriorLogOdds: -1.2,
+    behaviouralSignatures: [
+      {
+        whenIntent: ["ADD_REAGENT", "MIX_SUBSTANCES"],
+        predicate: "reagent_added_before_indicator",
+        evidenceType: "sequence",
+        logLikelihoodRatio: 1.3,
+        source: "Adding the titrant before the indicator defeats endpoint detection — classic procedural slip (Sri Lankan O/L 'Acids, Bases and Salts').",
+      },
+    ],
     severity: "high",
   },
   {
@@ -218,6 +258,23 @@ const misconceptions = [
     feedbackTemplate: "In step {step}, the indicator color change is due to pH change, not temperature!",
     prevalenceGrades: [9, 10],
     detectionTriggers: ["incorrect_indicator_observation"],
+    behaviouralPriorLogOdds: -1.0,
+    behaviouralSignatures: [
+      {
+        whenIntent: ["ADD_REAGENT", "MEASURE_RESULT", "OBSERVE_RESULT"],
+        predicate: "heat_during_indicator_or_endpoint_task",
+        evidenceType: "commission",
+        logLikelihoodRatio: 1.4,
+        source: "Chandrasegaran, Treagust & Mocerino (2007) two-tier acid-base diagnostic — indicator/temperature confusion.",
+      },
+      {
+        whenIntent: ["MEASURE_RESULT", "RECORD_RESULT", "OBSERVE_RESULT"],
+        predicate: "thermometer_used_to_judge_endpoint",
+        evidenceType: "commission",
+        logLikelihoodRatio: 1.2,
+        source: "As above — reaching for a thermometer to 'read' an indicator endpoint.",
+      },
+    ],
     severity: "medium",
   },
   {
@@ -231,6 +288,16 @@ const misconceptions = [
     feedbackTemplate: "In step {step}, pH 7 is not always the endpoint. It depends on the strength of the acid and base!",
     prevalenceGrades: [10, 11],
     detectionTriggers: ["incorrect_endpoint_ph"],
+    behaviouralPriorLogOdds: -1.0,
+    behaviouralSignatures: [
+      {
+        whenIntent: ["MEASURE_RESULT", "RECORD_RESULT"],
+        predicate: "ph7_recorded_as_endpoint",
+        evidenceType: "commission",
+        logLikelihoodRatio: 1.4,
+        source: "Sheppard (2006) — students expect exactly pH 7 at every neutralisation endpoint, ignoring acid/base strength.",
+      },
+    ],
     severity: "medium",
   },
   {
@@ -244,6 +311,16 @@ const misconceptions = [
     feedbackTemplate: "In step {step}, mixing chemicals doesn't automatically cause a reaction — it depends on the properties of the substances involved.",
     prevalenceGrades: [6, 7, 8, 9],
     detectionTriggers: ["mixed_unrelated_chemicals", "no_known_reaction_attempted"],
+    behaviouralPriorLogOdds: -1.3,
+    behaviouralSignatures: [
+      {
+        whenIntent: ["MIX_SUBSTANCES", "ADD_REAGENT", "PREPARE_SAMPLE"],
+        predicate: "combined_non_reacting_substances",
+        evidenceType: "commission",
+        logLikelihoodRatio: 1.1,
+        source: "Kind (2004) 'Beyond Appearances' — expecting every combination of substances to react.",
+      },
+    ],
     severity: "medium",
   },
   {
@@ -257,6 +334,16 @@ const misconceptions = [
     feedbackTemplate: "In step {step}, displacement only happens when the metal used is more reactive than the metal in the solution.",
     prevalenceGrades: [9, 10, 11],
     detectionTriggers: ["incorrect_displacement_prediction"],
+    behaviouralPriorLogOdds: -1.2,
+    behaviouralSignatures: [
+      {
+        whenIntent: ["ADD_REAGENT", "MIX_SUBSTANCES", "PREPARE_SAMPLE"],
+        predicate: "less_reactive_metal_chosen_for_displacement",
+        evidenceType: "commission",
+        logLikelihoodRatio: 1.5,
+        source: "Sri Lankan O/L 'Reactivity Series of Metals' — choosing a metal below the salt's metal for a displacement.",
+      },
+    ],
     severity: "medium",
   },
   {
@@ -270,6 +357,16 @@ const misconceptions = [
     feedbackTemplate: "In step {step}, this reaction doesn't require heat — consider whether it changes the outcome before using the burner.",
     prevalenceGrades: [7, 8, 9, 10],
     detectionTriggers: ["unnecessary_heat_applied"],
+    behaviouralPriorLogOdds: -1.1,
+    behaviouralSignatures: [
+      {
+        whenIntent: [],
+        predicate: "heat_applied_when_task_not_thermal",
+        evidenceType: "commission",
+        logLikelihoodRatio: 1.0,
+        source: "Taber (2002) — over-generalising activation-energy intuition to reactions that proceed at room temperature.",
+      },
+    ],
     severity: "low",
   },
   {

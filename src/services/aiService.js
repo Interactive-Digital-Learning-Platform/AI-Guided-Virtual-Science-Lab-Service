@@ -4,8 +4,12 @@ const Misconception = require("../models/Misconception");
  * Rule-Based Behavior Analysis Engine
  * Analyzes session actions and detects misconceptions
  */
-const analyzeSession = async (session, actions) => {
-  const misconceptionsDetected = [];
+// opts.modelDiagnosis (M5) — when present (treatment-arm session, STUDENT_MODEL_DRIVES_DIAGNOSIS),
+// the Bayesian misconception posterior REPLACES the rule-derived list below; everything downstream
+// (strengths, struggle analysis, understanding, the LLM feedback) then reflects the model's view.
+// Absent ⇒ nothing changes (shadow / control / flags off).
+const analyzeSession = async (session, actions, opts = {}) => {
+  let misconceptionsDetected = [];
   const strengths = [];
   const suggestions = [];
 
@@ -86,6 +90,19 @@ const analyzeSession = async (session, actions) => {
   if (session.score >= 80) strengths.push("Strong overall performance on this experiment.");
   if (features.totalRetries === 0) strengths.push("You completed all steps correctly on the first attempt.");
 
+  // ── M5: model-driven diagnosis swap ────────────────────────────────────
+  const ruleMisconceptionCodes = misconceptionsDetected.map((m) => m.code).filter(Boolean);
+  if (Array.isArray(opts.modelDiagnosis) && opts.modelDiagnosis.length) {
+    misconceptionsDetected = opts.modelDiagnosis.map((d) => ({
+      code: d.code,
+      description: d.description,
+      relatedStep: d.relatedStep ?? null,
+      correctionStrategy: d.correctionStrategy,
+    }));
+    conceptsToImprove.clear();
+    for (const d of opts.modelDiagnosis) for (const c of d.relatedConcepts || []) conceptsToImprove.add(c);
+  }
+
   // ── Deterministic performance context (Phase 2 analytics) ───────────────
   // Everything below is verified/pre-computed — this is exactly what the personalized-feedback
   // LLM is handed (spec §18/§22: the model rephrases, it never derives numbers or rankings).
@@ -151,6 +168,9 @@ const analyzeSession = async (session, actions) => {
     conceptsToImprove: [...conceptsToImprove],
     finalUnderstandingAssessment: performanceContext.understanding,
     feedbackGeneratedAt: new Date(),
+    // Not part of the aiFeedback sub-schema (Mongoose drops it on save) — the caller reads it off
+    // the return value to store studentModel.shadowRuleMisconceptions for the research comparison.
+    _ruleMisconceptions: ruleMisconceptionCodes,
   };
 };
 

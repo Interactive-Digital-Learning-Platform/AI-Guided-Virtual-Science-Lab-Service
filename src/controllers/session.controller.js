@@ -9,6 +9,8 @@ const LabRun = require("../models/LabRun");
 const { analyzeSession } = require("../services/aiService");
 const { generateFeedback } = require("../services/feedbackService");
 const scoring = require("../services/labScoringService");
+const flags = require("../config/featureFlags");
+const studentModelRunner = require("../services/studentModelRunner");
 const { resolvePhysicsMeasurement: resolveMechanicsMeasurement, checkMeasurementTolerance } = require("../services/mechanicsEngine");
 const { resolvePhysicsMeasurement: resolveCircuitMeasurement, evaluateBoard } = require("../services/circuitEngine");
 
@@ -27,7 +29,9 @@ const {
   generateChemicalHint,
   generateTaskHint,
   generateCircuitHint,
+  generateMisconceptionHint,
 } = require("../services/labHintService");
+const studentModelService = require("../services/studentModelService");
 const {
   curriculumReferenceForStep,
   practicalCurriculumReference,
@@ -303,6 +307,8 @@ const startSession = async (req, res, next) => {
       userId: req.user._id,
       experimentId,
       attemptNumber: prevAttempts + 1,
+      // RCT arm — stable per user, "off" unless STUDENT_MODEL_ENABLED (see config/featureFlags.js).
+      experimentArm: flags.experimentArmForUser(req.user._id),
     });
 
     res.status(201).json({ success: true, message: "Session started.", data: session });
@@ -628,8 +634,8 @@ const logAction = async (req, res, next) => {
     let measurementResult = null;
     let mismatchKind = null;
     let benchEquipmentTypes = [];
-    // Hoisted to function scope: the proactive-intervention block below (outside this `if (step)`)
-    // reads evalResult.materialsInInventoryOk. Left block-scoped, that path threw a ReferenceError.
+    // Hoisted to the function scope: the intervention block below (outside this `if (step)`) reads
+    // evalResult.materialsInInventoryOk, and the student-model compute reads evalResult.labRun.actions.
     let evalResult = null;
 
     if (step) {
@@ -859,6 +865,23 @@ const logAction = async (req, res, next) => {
       }
     }
 
+    // Bayesian misconception model — recompute from the live bench and persist per-attempt. Drives
+    // the intervention below ONLY for a treatment-arm session with STUDENT_MODEL_DRIVES_HINTS;
+    // otherwise it's pure shadow telemetry for the report / research export. Non-fatal.
+    let liveModel = null;
+    if (flags.isStudentModelEnabled() && step && evalResult && evalResult.labRun) {
+      try {
+        liveModel = await studentModelRunner.computeLive({
+          session,
+          experiment,
+          benchActions: evalResult.labRun.actions || [],
+        });
+        if (liveModel) session.studentModel = liveModel;
+      } catch (err) {
+        console.error("[studentModel] live compute failed (non-fatal):", err.message);
+      }
+    }
+
     await session.save();
 
     // Real-time hint trigger: if 2+ errors on the same Current Task, suggest hint
@@ -881,7 +904,59 @@ const logAction = async (req, res, next) => {
     // instruction otherwise — so the hint stays scoped to what's actually being asked.
     const activePrompt = target?.usingMicroSteps ? target.microStep.studentPrompt : step?.instruction;
 
-    if (mismatchKind === "equipment") {
+    // M5 — posterior-driven intervention (treatment arm + STUDENT_MODEL_DRIVES_HINTS only). Takes
+    // priority over the mismatchKind hints below: it targets the *misconception* behind the
+    // mistake, not just "wrong tool". Falls straight through to the existing logic when the model
+    // has nothing confident to say, so control / shadow / flags-off behaviour is unchanged.
+    let modelIntervention = null;
+    if (step && liveModel && flags.studentModelDrivesHints(session)) {
+      try {
+        const currentTaskCtx = {
+          stepId: session.currentStep,
+          microStepId: session.currentMicroStep,
+          expectedIntent: target?.usingMicroSteps ? target.microStep.expectedIntent : null,
+        };
+        const signaturesByCode = await studentModelRunner.loadSignaturesByCode();
+        const decision = studentModelService.shouldIntervene({
+          studentModel: liveModel,
+          task: currentTaskCtx,
+          signaturesByCode,
+        });
+        if (decision.intervene && decision.reason === "misconception") {
+          const kb = signaturesByCode[decision.misconceptionCode] || {};
+          const hintLevel = Math.max(decision.level || 1, autoHintLevel || 1);
+          modelIntervention = {
+            type: "misconception_hint",
+            level: hintLevel,
+            misconceptionCode: decision.misconceptionCode,
+            hint: await generateMisconceptionHint({
+              experimentTitle: experiment.title,
+              studentPrompt: activePrompt,
+              misconceptionDescription: kb.description,
+              correctionStrategy: kb.correctionStrategy,
+              level: hintLevel,
+              grade: req.user.grade,
+            }),
+          };
+          if (activeEntry) activeEntry.highestHintLevel = Math.max(activeEntry.highestHintLevel || 0, hintLevel);
+        } else if (decision.intervene && decision.reason === "divergence") {
+          modelIntervention = {
+            type: "divergence_nudge",
+            hint: await generateInterventionHint({
+              triggerType: "off_task",
+              experimentTitle: experiment.title,
+              context: { stepId, microStepId: gradedMicroStepId },
+            }),
+          };
+        }
+      } catch (err) {
+        console.error("[studentModel] intervention failed (non-fatal):", err.message);
+      }
+    }
+
+    if (modelIntervention) {
+      intervention = modelIntervention;
+    } else if (mismatchKind === "equipment") {
       intervention = {
         type: "equipment_hint",
         level: autoHintLevel,
@@ -1031,9 +1106,34 @@ const completeSession = async (req, res, next) => {
         ? parseFloat((session.behaviorFeatures.totalErrors / session.behaviorFeatures.totalActions).toFixed(2))
         : 0;
 
-    // Run AI analysis
-    const analysisResult = await analyzeSession(session, allActions);
+    // Bayesian misconception model — computed BEFORE the AI analysis so a treatment-arm session
+    // (STUDENT_MODEL_DRIVES_DIAGNOSIS) can hand its posterior to analyzeSession, where it replaces
+    // the rule-derived misconception list. SHADOW / control / flags-off: still computed + persisted
+    // for the report and research export, but drives nothing. Non-fatal — a model bug must never
+    // break session completion.
+    let modelDiagnosis = null;
+    if (flags.isStudentModelEnabled()) {
+      try {
+        const model = await studentModelRunner.computeForSession({ session, experiment: session.experimentId });
+        if (model) {
+          session.studentModel = model;
+          if (flags.studentModelDrivesDiagnosis(session)) {
+            modelDiagnosis = await studentModelRunner.diagnoseFromSnapshot(model);
+          }
+        }
+      } catch (err) {
+        console.error("[studentModel] compute failed (non-fatal):", err.message);
+      }
+    }
+
+    // Run AI analysis. modelDiagnosis (when non-null) replaces the rule-derived misconceptions.
+    const analysisResult = await analyzeSession(session, allActions, { modelDiagnosis });
     session.aiFeedback = analysisResult;
+
+    // Store what the RULES concluded alongside the model's posterior, for the shadow comparison.
+    if (session.studentModel) {
+      session.studentModel.shadowRuleMisconceptions = analysisResult._ruleMisconceptions || [];
+    }
 
     await session.save();
 
@@ -1178,6 +1278,23 @@ const getSessionReport = async (req, res, next) => {
         },
         aiFeedback: session.aiFeedback,
         conceptsToImprove: session.aiFeedback.conceptsToImprove || [],
+        // M5 — model-inferred misconception insight ("why we think this": probability + how many
+        // bench actions signalled it). Populated for a treatment-arm session only; null for
+        // control / shadow / flags-off, so those reports are byte-identical to before.
+        misconceptionInsight:
+          flags.studentModelDrivesDiagnosis(session) && session.studentModel
+            ? {
+                cluster: session.studentModel.cluster,
+                items: (session.studentModel.misconceptions || [])
+                  .filter((m) => m.probability >= 0.55)
+                  .map((m) => ({
+                    code: m.code,
+                    probability: m.probability,
+                    signalCount: (m.evidence || []).length,
+                    firstSeenStep: (m.evidence || [])[0]?.stepId ?? null,
+                  })),
+              }
+            : null,
         practicalReference,
         followUpReading,
         finalUnderstandingAssessment: session.aiFeedback.finalUnderstandingAssessment || null,
@@ -1422,7 +1539,45 @@ const requestHint = async (req, res, next) => {
     // Material Library). Never carries the required material's name/id — that stays server-side
     // until the Help reveal (see requestHelp).
     let suggestedAction = null;
-    if (target.requiresCircuitPlacementCheck) {
+    // M5 — on a treatment-arm session with STUDENT_MODEL_DRIVES_HINTS, if the Bayesian model has a
+    // confident misconception relevant to the current task, the on-demand hint targets that belief.
+    // Otherwise (control / shadow / flags-off / nothing confident) the existing branches run unchanged.
+    let modelHintCode = null;
+    if (flags.studentModelDrivesHints(session)) {
+      try {
+        const model = await studentModelRunner.computeForSession({ session, experiment: session.experimentId });
+        if (model) {
+          const signaturesByCode = await studentModelRunner.loadSignaturesByCode();
+          const decision = studentModelService.shouldIntervene({
+            studentModel: model,
+            task: {
+              stepId: session.currentStep,
+              microStepId: session.currentMicroStep,
+              expectedIntent: target.usingMicroSteps ? target.microStep.expectedIntent : null,
+            },
+            signaturesByCode,
+          });
+          if (decision.intervene && decision.reason === "misconception") {
+            const kb = signaturesByCode[decision.misconceptionCode] || {};
+            hintText = await generateMisconceptionHint({
+              experimentTitle: session.experimentId.title,
+              studentPrompt: activePrompt,
+              misconceptionDescription: kb.description,
+              correctionStrategy: kb.correctionStrategy,
+              level: hintLevel,
+              grade: req.user.grade,
+            });
+            modelHintCode = decision.misconceptionCode;
+          }
+        }
+      } catch (err) {
+        console.error("[studentModel] hint failed (non-fatal):", err.message);
+      }
+    }
+
+    if (modelHintCode) {
+      // hintText was set by the model-driven branch above.
+    } else if (target.requiresCircuitPlacementCheck) {
       // Electricity (Phase B): a PLACE_COMPONENT task's real gap is slot correctness, not
       // equipment presence (the equipment usually already exists on the bench) — route straight
       // to the circuit-aware hint rather than falling into the generic equipment-hint branch
@@ -1545,6 +1700,9 @@ const requestHint = async (req, res, next) => {
         // Textbook lesson/page pointer for this step (hint level >= 2 only). null when there's no
         // confident curriculum match. See curriculumReferenceService.formatCurriculumReference.
         curriculumReference,
+        // M5 — set when this hint targeted a model-inferred misconception (treatment arm). null
+        // otherwise. Purely informational for the client / analytics.
+        misconceptionCode: modelHintCode,
       },
     });
   } catch (error) {
