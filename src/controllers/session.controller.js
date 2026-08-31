@@ -1249,6 +1249,32 @@ const getSessionReport = async (req, res, next) => {
       session.behaviorFeatures?.struggledSteps || []
     );
 
+    // M5 — model-inferred misconception insight for the mobile "What We Noticed" card, enriched
+    // with the KB text (title / plain description / correction strategy). Treatment-arm sessions
+    // only; null for control / shadow / flags-off so those reports are unchanged.
+    let misconceptionInsight = null;
+    if (flags.studentModelDrivesDiagnosis(session) && session.studentModel) {
+      try {
+        const dx = await studentModelRunner.diagnoseFromSnapshot(session.studentModel);
+        if (dx.length) {
+          misconceptionInsight = {
+            cluster: session.studentModel.cluster || null,
+            items: dx.map((d) => ({
+              code: d.code,
+              title: d.title || null,
+              description: d.description || null,
+              correctionStrategy: d.correctionStrategy || null,
+              probability: d.probability,
+              signalCount: (d.evidence || []).length,
+              firstSeenStep: d.relatedStep ?? null,
+            })),
+          };
+        }
+      } catch (err) {
+        console.error("[studentModel] report insight failed (non-fatal):", err.message);
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -1278,23 +1304,9 @@ const getSessionReport = async (req, res, next) => {
         },
         aiFeedback: session.aiFeedback,
         conceptsToImprove: session.aiFeedback.conceptsToImprove || [],
-        // M5 — model-inferred misconception insight ("why we think this": probability + how many
-        // bench actions signalled it). Populated for a treatment-arm session only; null for
-        // control / shadow / flags-off, so those reports are byte-identical to before.
-        misconceptionInsight:
-          flags.studentModelDrivesDiagnosis(session) && session.studentModel
-            ? {
-                cluster: session.studentModel.cluster,
-                items: (session.studentModel.misconceptions || [])
-                  .filter((m) => m.probability >= 0.55)
-                  .map((m) => ({
-                    code: m.code,
-                    probability: m.probability,
-                    signalCount: (m.evidence || []).length,
-                    firstSeenStep: (m.evidence || [])[0]?.stepId ?? null,
-                  })),
-              }
-            : null,
+        // M5 — model-inferred misconception insight ("what we noticed" + why). Treatment-arm only;
+        // null for control / shadow / flags-off, so those reports are byte-identical to before.
+        misconceptionInsight,
         practicalReference,
         followUpReading,
         finalUnderstandingAssessment: session.aiFeedback.finalUnderstandingAssessment || null,

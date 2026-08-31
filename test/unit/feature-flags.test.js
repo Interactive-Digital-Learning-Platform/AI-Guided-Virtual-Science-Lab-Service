@@ -38,6 +38,22 @@ test("experimentArmForUser — 'off' when disabled, stable per user when enabled
   });
 });
 
+test("experimentArmForUser — STUDENT_MODEL_FORCE_ARM overrides the split (dev only)", () => {
+  withEnv({ STUDENT_MODEL_ENABLED: "true", STUDENT_MODEL_FORCE_ARM: "treatment" }, () => {
+    assert.equal(flags.experimentArmForUser("user-abc"), "treatment");
+    assert.equal(flags.experimentArmForUser("user-xyz"), "treatment");
+  });
+  withEnv({ STUDENT_MODEL_ENABLED: "true", STUDENT_MODEL_FORCE_ARM: "control" }, () => {
+    assert.equal(flags.experimentArmForUser("user-abc"), "control");
+  });
+  withEnv({ STUDENT_MODEL_ENABLED: undefined, STUDENT_MODEL_FORCE_ARM: "treatment" }, () => {
+    assert.equal(flags.experimentArmForUser("user-abc"), "off", "force does nothing when the feature is off");
+  });
+  withEnv({ STUDENT_MODEL_ENABLED: "true", STUDENT_MODEL_FORCE_ARM: "nonsense" }, () => {
+    assert.ok(["treatment", "control"].includes(flags.experimentArmForUser("user-abc")), "invalid value ignored");
+  });
+});
+
 test("experimentArmForUser — the split is roughly balanced across many users", () => {
   withEnv({ STUDENT_MODEL_ENABLED: "true" }, () => {
     let treatment = 0;

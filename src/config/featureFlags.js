@@ -18,8 +18,13 @@ const isStudentModelEnabled = () => truthy(process.env.STUDENT_MODEL_ENABLED);
 
 // Stable per-USER 50/50 assignment (a student stays in one arm across all their attempts, so the
 // two arms never contaminate each other). "off" whenever the feature is disabled.
+// STUDENT_MODEL_FORCE_ARM=treatment|control overrides the split — DEV/DEMO ONLY (so you can see the
+// model-driven hints and the report card without hunting for a treatment-hashed account). Never
+// set it during an actual study — it breaks randomisation.
 const experimentArmForUser = (userId) => {
   if (!isStudentModelEnabled()) return "off";
+  const forced = String(process.env.STUDENT_MODEL_FORCE_ARM || "").toLowerCase();
+  if (forced === "treatment" || forced === "control") return forced;
   const firstByte = crypto.createHash("md5").update(String(userId)).digest()[0];
   return firstByte < 128 ? "control" : "treatment";
 };
