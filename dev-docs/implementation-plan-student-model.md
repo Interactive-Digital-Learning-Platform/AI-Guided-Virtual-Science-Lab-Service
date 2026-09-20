@@ -1,6 +1,6 @@
 # Implementation Plan — Bayesian Misconception Student Model
 
-Status: **M0–M6 complete (code side pilot-ready, shipped behind flags, 75 tests green).**
+Status: **M0–M6 complete; M7 calibration/pilot validation in progress (code side pilot-ready, shipped behind flags).**
 Workstream D: the two-tier concept inventory is **drafted** ([concept-inventory-acid-base.md](./concept-inventory-acid-base.md)) —
 needs expert review + a validity pilot. Then: ethics approval, shadow-mode pilot, run the studies. See §8b.
 Companion to: [research-direction.md](./research-direction.md) — read §2 (claim), §5 (method), §6 (codebase map) first.
@@ -318,20 +318,23 @@ Workstream D (concept inventory, ethics) runs alongside and gates the *study*, n
 
 ## 8. Definition of done (feature)
 
-- [ ] `npm test` green; regression snapshots unchanged with flags off
+- [x] `npm test` green; regression snapshots unchanged with flags off
 - [ ] `studentModel` populated on every new completed session in shadow mode, with a non-empty
       evidence trail on sessions where a misconception was exhibited
-- [ ] With `DRIVES_*` on for a `treatment` session: at least one misconception-targeted hint and a
+- [x] With `DRIVES_*` on for a `treatment` session: at least one misconception-targeted hint and a
       posterior-based report section; `control` sessions identical to today
-- [ ] Every signature has ≥1 fixture test and a `source` citation
-- [ ] `scripts/analysis/predictive-validity.js` produces AUC of first-half posterior vs. a labelled
+- [x] Every signature has ≥1 fixture test and a `source` citation
+- [x] `scripts/analysis/predictive-validity.js` produces AUC of first-half posterior vs. a labelled
       outcome column
-- [ ] README documents the flags, the arm field, and how to run the analysis scripts
+- [x] README documents the flags, the arm field, and how to run the analysis scripts
 
 ## 8b. Progress log
 
 | Date | Milestone | Notes |
 |---|---|---|
+| 2026-09-16 | **M7 data collection — prepared, not authorised** | Generated an ignored 15-participant workspace (`P01`–`P15`), participant-only Form A/B files with answer-key/control leakage removed, response/session/consent trackers, approval brief, and `pilot-status.js` validation. The teacher materials were delivered, but the repository contains no completed expert decision/signature and no ethics/internal-pilot reference; the validator therefore reports `authorizedToCollect=NO` and prevents the collection pack from being considered ready. |
+| 2026-09-16 | **M7 pilot operations — ready** | Returned the local environment to shadow-safe flags after finding diagnosis enabled + a forced treatment arm. Added collection templates, expert-review checklist, pilot runbook, `training-readiness.js`, reliability/timing/parallel-form statistics, and data-leakage guards. A fresh read-only exact-replay export contains 1 qualifying Acid-Base Neutralization session from 1 unique student and 0 inventory labels; calibration correctly remains blocked until paired pilot labels are collected. |
+| 2026-09-16 | **M7 — in progress** | Audited M0-M6 against the repository. The full suite is green (test count has grown beyond the stale 75-test headline). Hardened parameter training: full exports now carry exact replay context including chemical metadata; fitting uses regularised log loss so priors are identifiable; repeated attempts from one student stay in one fold; evaluation is out-of-fold; `--out` writes an auditable calibration artifact. Added tests, root flag/training documentation, and a dated two-week completion track. Remaining: expert/ethics gate, real shadow sessions, labelled pilot data, parameter approval, and treatment/control release sign-off. |
 | 2026-08-30 | **M0 — done** | `npm test` wired (`node --test`, zero deps, Node 24). `test/` created: `smoke`, `fixtures/sessions.js`, and regression golden-output guards for `labScoringService` / `reportAnalyticsService` / `curriculumReferenceService` (19 tests, green). `test/README.md` documents the setup + snapshot-refresh flow. Found: `Misconception.detectionTriggers[]` already exists in schema + data but is **read by no code** — it is the dormant hook `behaviouralSignatures[]` (M1) formalises. |
 | 2026-08-30 | **M1 — done** | `models/Misconception.js` + `behaviouralSignatures[]` (`whenIntent`/`predicate`/`evidenceType`/`logLikelihoodRatio`/`source`) and `behaviouralPriorLogOdds` — both additive/optional, no behaviour change. Signatures authored in `data/misconceptions.js` for the **acid–base cluster** (CHEM_001/002/003/004) + CHEM_005/006 + 3 physics samples (PHY_010/011/013), each with a literature `source`. 11 predicate names defined (impl in M2). `data/migrations/20260830-behavioural-signatures.js` (additive reconcile, mirrors existing migration pattern). `test/unit/misconception-signatures.test.js` lints every signature (valid intents, sane LLR, citation present) — 23 tests green. `npm run seed` needs no change (raw `insertMany` passes the new fields through). |
 | 2026-08-30 | **M2 — done** | `services/studentModelService.js` (**new, pure, ~360 lines**): `computeStudentModel` (naive-Bayes log-odds per misconception, damped repeats, clamp ±6, task attribution via `buildTaskTimeline` from `stepProgress` timing with a `currentTask` fallback for the live call), `diagnose`, `shouldIntervene`, plus the 10 wired predicates. `test/fixtures/trajectories.js` (scenario builder + `signaturesByCode` from the real authored data). `test/unit/student-model.test.js` — one trajectory per signature + positive/negative pairs + `diagnose`/`shouldIntervene`/clean-run/timeline-fallback (25 tests). **Full suite 44 green; `studentModelService` line coverage 96%.** No `src/` behaviour change yet — service is not called from anywhere (M3 wires it). CHEM_005 predicate is best-effort (needs `chemicalsById` + formula cation parse); degrades to `false` without it. |

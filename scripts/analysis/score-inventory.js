@@ -18,6 +18,8 @@
 const fs = require("fs");
 const { parseArgs } = require("./lib/args");
 const { scoreResponses, CODES, CODE_ITEMS, CONTROL_ITEMS } = require("./lib/inventoryKey");
+const { cronbachAlpha, itemRestCorrelation, parallelFormSummary } = require("./lib/inventoryStats");
+const { THRESHOLDS, reviewItems, prevalenceReview } = require("./lib/itemReview");
 
 const a = parseArgs(process.argv.slice(2), ["o", "out", "form", "sessions"]);
 const inPath = a._[0];
@@ -74,6 +76,7 @@ for (const row of rows) {
     answered: res.answered,
     labels: res.labels,
     perItem: res.perItem,
+    durationMinutes: row.durationMinutes === "" || row.durationMinutes == null ? null : Number(row.durationMinutes),
   });
 }
 
@@ -103,6 +106,9 @@ if (lowAnswered.length) console.log(`  ⚠ ${lowAnswered.length} sheet(s) with <
 
 // ── optional item stats (for the §8 validity checklist) ──────────────────────
 if (a["item-stats"]) {
+  const matrix = scored.map((s) => s.perItem.map((item) => (item.bothCorrect ? 1 : 0)));
+  const alpha = cronbachAlpha(matrix);
+  console.log(`\nCronbach's alpha (15 binary item scores): ${alpha == null ? "not estimable" : alpha.toFixed(3)}  (target >= ~0.6)`);
   console.log("\nitem | n | %correct | %flag-code");
   for (let i = 1; i <= 15; i += 1) {
     const its = scored.map((s) => s.perItem[i - 1]);
@@ -112,17 +118,59 @@ if (a["item-stats"]) {
     const tag = CONTROL_ITEMS.includes(i) ? "control" : Object.keys(CODE_ITEMS).find((c) => CODE_ITEMS[c].includes(i));
     console.log(`  ${String(i).padStart(2)} (${tag.padEnd(8)}) | ${String(n).padStart(3)} | ${pc.padStart(3)}% | ${pf.padStart(3)}%`);
   }
-  // crude discrimination: point-biserial of each item's correctness with the total
-  const totals = scored.map((s) => s.conceptualScore);
-  const mean = totals.reduce((x, y) => x + y, 0) / totals.length;
-  const sd = Math.sqrt(totals.reduce((x, y) => x + (y - mean) ** 2, 0) / totals.length) || 1;
-  console.log("\nitem discrimination (point-biserial with total score; want > 0.2):");
+  console.log("\nitem discrimination (item-rest correlation; want > 0.2):");
   for (let i = 1; i <= 15; i += 1) {
-    const x = scored.map((s) => (s.perItem[i - 1].bothCorrect ? 1 : 0));
-    const p = x.reduce((a2, b) => a2 + b, 0) / x.length;
-    if (p === 0 || p === 1) { console.log(`  ${String(i).padStart(2)}:  (no variance)`); continue; }
-    const meanCorrect = scored.filter((s) => s.perItem[i - 1].bothCorrect).reduce((n2, s) => n2 + s.conceptualScore, 0) / (p * x.length);
-    const rpb = ((meanCorrect - mean) / sd) * Math.sqrt(p / (1 - p));
-    console.log(`  ${String(i).padStart(2)}: ${rpb.toFixed(2)}`);
+    const correlation = itemRestCorrelation(matrix, i - 1);
+    console.log(`  ${String(i).padStart(2)}: ${correlation == null ? "(no variance)" : correlation.toFixed(2)}`);
   }
+
+  const durations = scored.map((s) => s.durationMinutes).filter((value) => Number.isFinite(value) && value >= 0);
+  if (durations.length) {
+    const within25 = durations.filter((value) => value <= 25).length;
+    console.log(`\ntiming: ${within25}/${durations.length} (${((100 * within25) / durations.length).toFixed(0)}%) completed within 25 minutes (target >=90%)`);
+  } else console.log("\ntiming: not available (fill durationMinutes in responses.csv)");
+
+  const parallel = parallelFormSummary(scored);
+  if (parallel.n) {
+    console.log(
+      `parallel forms: paired n=${parallel.n}, mean A=${parallel.meanA.toFixed(2)}, mean B=${parallel.meanB.toFixed(2)}, ` +
+        `mean B-A=${parallel.meanDifference.toFixed(2)}`
+    );
+    console.log(`  largest item difficulty shift |B-A|=${Math.max(...parallel.itemDifficultyDelta.map(Math.abs)).toFixed(2)}`);
+  } else console.log("parallel forms: no participants with both A and B rows");
+
+  // ── fix / keep decision table (rules from concept-inventory §8) ──────────────
+  const reviewed = reviewItems(
+    Array.from({ length: 15 }, (_, idx) => {
+      const its = scored.map((s) => s.perItem[idx]);
+      const code = CONTROL_ITEMS.includes(idx + 1) ? null : Object.keys(CODE_ITEMS).find((c) => CODE_ITEMS[c].includes(idx + 1));
+      return {
+        item: idx + 1,
+        code,
+        n: its.length,
+        answered: its.filter((x) => x.answered).length,
+        correct: its.filter((x) => x.bothCorrect).length,
+        flagged: its.filter((x) => x.flagsCode).length,
+        discrimination: itemRestCorrelation(matrix, idx),
+      };
+    })
+  );
+  console.log(`\n=== REVIEW TABLE (difficulty ${THRESHOLDS.minDifficulty}–${THRESHOLDS.maxDifficulty}, discrimination >= ${THRESHOLDS.minDiscrimination}, omissions <= ${THRESHOLDS.maxOmissionRate * 100}%) ===`);
+  for (const r of reviewed) {
+    console.log(`  item ${String(r.item).padStart(2)} ${(r.code || "control").padEnd(8)} ${r.verdict.padEnd(6)} ${r.reasons.join("; ")}`);
+  }
+  const toReview = reviewed.filter((r) => r.verdict === "REVIEW").map((r) => r.item);
+  console.log(`  -> ${toReview.length ? `review items: ${toReview.join(", ")}` : "no item flagged"}`);
+
+  const perCode = {};
+  for (const code of CODES) {
+    perCode[code] = { flagged: scored.filter((s) => s.labels[code] === 1).length, n: scored.length };
+  }
+  console.log("\n=== MISCONCEPTION PREVALENCE (need >= 25% flagged, else the study can't speak to that code) ===");
+  for (const p of prevalenceReview(perCode)) {
+    console.log(`  ${p.code}: ${p.flagged}/${p.n} (${p.rate == null ? "n/a" : (p.rate * 100).toFixed(0) + "%"}) ${p.verdict}${p.note ? " — " + p.note : ""}`);
+  }
+  console.log(
+    `\nstatistics guide a human review — with n=${scored.length} they are noisy and never justify dropping an item without the teacher's judgement.`
+  );
 }

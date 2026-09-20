@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { scoreResponses, CODE_ITEMS } = require("../../scripts/analysis/lib/inventoryKey");
+const { cronbachAlpha, itemRestCorrelation, parallelFormSummary } = require("../../scripts/analysis/lib/inventoryStats");
 
 // Build a response row: allCorrect, then apply overrides { [item]: [answer, reason] }.
 function sheet(overrides = {}) {
@@ -84,4 +85,28 @@ test("every misconception maps to exactly 3 items, none shared", () => {
   const all = Object.values(CODE_ITEMS).flat();
   assert.equal(all.length, 12);
   assert.equal(new Set(all).size, 12);
+});
+
+test("inventory statistics — alpha and item-rest correlation are 1 for perfectly consistent items", () => {
+  const matrix = [
+    [1, 1, 1],
+    [1, 1, 1],
+    [0, 0, 0],
+    [0, 0, 0],
+  ];
+  assert.equal(cronbachAlpha(matrix), 1);
+  assert.equal(itemRestCorrelation(matrix, 0), 1);
+});
+
+test("inventory statistics — parallel-form summary pairs by participant", () => {
+  const perItem = (correct) => Array.from({ length: 15 }, () => ({ bothCorrect: correct }));
+  const summary = parallelFormSummary([
+    { participantCode: "P01", form: "A", conceptualScore: 10, perItem: perItem(true) },
+    { participantCode: "P01", form: "B", conceptualScore: 12, perItem: perItem(true) },
+    { participantCode: "P02", form: "A", conceptualScore: 8, perItem: perItem(false) },
+  ]);
+  assert.equal(summary.n, 1);
+  assert.equal(summary.meanA, 10);
+  assert.equal(summary.meanB, 12);
+  assert.equal(summary.meanDifference, 2);
 });

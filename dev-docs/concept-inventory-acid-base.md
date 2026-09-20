@@ -1,6 +1,9 @@
 # Two-Tier Concept Inventory — Acid–Base Neutralisation & Indicators
 
 Status: **draft instrument — needs expert review + a small validity pilot before the main study.**
+Operational materials: [expert-review checklist](./student-model-expert-review-checklist.md) and
+[pilot runbook](./student-model-pilot-runbook.md). Blank CSV templates live in
+`scripts/analysis/templates/`.
 Companion to [research-direction.md](./research-direction.md) §7.1 and
 [implementation-plan-student-model.md](./implementation-plan-student-model.md) §7.
 
