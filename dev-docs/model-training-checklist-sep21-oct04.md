@@ -87,16 +87,22 @@ Evidence from your only real Acid-Base run (session `6a94dfad…`):
 | CHEM_001 (order matters) | 97% | **20/20 hits = HCl (the acid) dispensed before the indicator** — that is the *correct* order (acid → indicator → base) |
 | CHEM_004 (all mixtures react) | 73% | 3/4 hits = **phenolphthalein** added (`no_reaction`, a correct step) |
 
-- [ ] `reagent_added_before_indicator` (CHEM_001): fire only when the **base/titrant** is added before the
-      indicator, never the acid; count the violation once, not once per action.
-- [ ] `combined_non_reacting_substances` (CHEM_004): exclude indicator additions and any combination the
-      current task expects; require the student to have combined two non-indicator reagents.
-- [ ] `ph7_recorded_as_endpoint` (CHEM_003): pH 7 is *correct* for strong acid + strong base — lower its
-      LLR, or gate on the teacher's scope decision; drop CHEM_003 if out of syllabus.
-- [ ] Bound the repeat accumulation: damping is LLR/n, so 20 repeats still add ≈3.6×LLR. Cap a single
-      signature's total contribution (e.g. ≤2×LLR).
-- [ ] Add **negative** regression tests: a correct-procedure trajectory must keep all four codes < 0.5
-      (the existing fixtures are positive-heavy).
+- [x] `reagent_added_before_indicator` (CHEM_001) — **done 2026-09-21.** Fires only when the acid AND base
+      meet with no indicator present; the acid alone (the correct order) never counts.
+- [x] `combined_non_reacting_substances` (CHEM_004) — **done.** Indicator additions and chemicals the current
+      task expects are excluded; stays silent without the chemical lookup.
+- [x] `ph7_recorded_as_endpoint` (CHEM_003) — **done.** Now RECORD_RESULT only, LLR 1.4 → 0.5; provably cannot
+      reach the diagnosis threshold on its own (test). *Still needs the teacher's scope decision; drop
+      CHEM_003 from the behavioural model if out of syllabus.*
+- [x] Repeat accumulation capped — **done.** One signature adds at most 2×LLR (`MAX_SIGNATURE_MULTIPLE`);
+      late repeats still count as evidence but add nothing.
+- [x] **Negative regression tests** — **done** (105/105): a full correct acid→indicator→base run raises no
+      diagnosis; acid-only-before-indicator, indicator-adds and task-expected additions never fire.
+- [ ] **Apply the DB update** (CHEM_003 params live in the DB, not the code):
+      `node src/data/migrations/20260830-behavioural-signatures.js --apply` (dry run shows 3 changes).
+      Then restart the backend — predicate code loads at startup.
+- Verified on the only real Acid-Base run (`6a94dfad…`): CHEM_001 97% → 23%, CHEM_004 73% → 21%, 0
+  evidence each, no diagnosis.
 - [ ] **Researcher-enacted scenarios** in the real app: 1 fully-correct run + 1 run enacting each of
       CHEM_001–004. Label them "researcher-enacted test scenarios" — they validate signature
       sensitivity/specificity only, are **not** participant data, and have no labels so they never

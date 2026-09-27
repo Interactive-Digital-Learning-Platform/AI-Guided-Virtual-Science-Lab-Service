@@ -39,7 +39,13 @@ function buildScenario({ relevantCodes, phases, requiredChemicals = [] }) {
   phases.forEach((ph, i) => {
     const startedAt = new Date(BASE + i * PHASE_MS);
     const completedAt = new Date(BASE + i * PHASE_MS + PHASE_MS - 1000);
-    microSteps.push({ microStepId: i + 1, studentPrompt: ph.prompt || `task ${i + 1}`, expectedIntent: ph.intent });
+    microSteps.push({
+      microStepId: i + 1,
+      studentPrompt: ph.prompt || `task ${i + 1}`,
+      expectedIntent: ph.intent,
+      // chemicals this task itself asks the student to use (adding one is expected, never a misconception)
+      expectedChemicalsForStep: ph.expectedChemicals || [],
+    });
     spMicro.push({
       microStepId: i + 1,
       startedAt,

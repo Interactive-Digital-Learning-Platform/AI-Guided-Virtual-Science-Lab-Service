@@ -242,7 +242,7 @@ const misconceptions = [
         predicate: "reagent_added_before_indicator",
         evidenceType: "sequence",
         logLikelihoodRatio: 1.3,
-        source: "Adding the titrant before the indicator defeats endpoint detection — classic procedural slip (Sri Lankan O/L 'Acids, Bases and Salts').",
+        source: "Adding the titrant before the indicator defeats endpoint detection — classic procedural slip (Sri Lankan O/L 'Acids, Bases and Salts'). Rule corrected 2026-09-20: fires only when the acid AND base meet with no indicator present; adding the analyte (acid) first is the CORRECT order and never counts.",
       },
     ],
     severity: "high",
@@ -291,11 +291,16 @@ const misconceptions = [
     behaviouralPriorLogOdds: -1.0,
     behaviouralSignatures: [
       {
-        whenIntent: ["MEASURE_RESULT", "RECORD_RESULT"],
+        // Only while RECORDING the result (not merely measuring), and weighted low: for the strong acid +
+        // strong base used in this practical pH 7 IS the correct end-point, so a pH-7 reading cannot by
+        // itself separate the misconception from correct practice. Corroborating evidence only — the
+        // concept inventory (Q2/Q7/Q13) is the primary measure of CHEM_003. Revisit after the teacher's
+        // syllabus-scope decision and real pilot data.
+        whenIntent: ["RECORD_RESULT"],
         predicate: "ph7_recorded_as_endpoint",
         evidenceType: "commission",
-        logLikelihoodRatio: 1.4,
-        source: "Sheppard (2006) — students expect exactly pH 7 at every neutralisation endpoint, ignoring acid/base strength.",
+        logLikelihoodRatio: 0.5,
+        source: "Sheppard (2006) — students expect exactly pH 7 at every neutralisation endpoint, ignoring acid/base strength. Weak/corroborating only: pH 7 is correct for strong acid + strong base (2026-09-20 review).",
       },
     ],
     severity: "medium",
@@ -318,7 +323,7 @@ const misconceptions = [
         predicate: "combined_non_reacting_substances",
         evidenceType: "commission",
         logLikelihoodRatio: 1.1,
-        source: "Kind (2004) 'Beyond Appearances' — expecting every combination of substances to react.",
+        source: "Kind (2004) 'Beyond Appearances' — expecting every combination of substances to react. Rule corrected 2026-09-20: an indicator addition or a chemical the current task itself asks for never counts (a 'no reaction' result is normal there).",
       },
     ],
     severity: "medium",

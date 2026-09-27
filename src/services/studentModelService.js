@@ -26,6 +26,7 @@ const LOG_ODDS_CLAMP = 6; // P ∈ [~0.0025, ~0.9975] — nothing is ever "certa
 const DIAGNOSE_THRESHOLD = 0.55; // report a misconception at/above this probability
 const INTERVENE_THRESHOLD = 0.65; // proactively hint about it at/above this
 const MAX_EVIDENCE_PER_CODE = 25; // bound the persisted evidence trail
+const MAX_SIGNATURE_MULTIPLE = 2; // one signature can add at most 2 × its LLR to a misconception, however often it repeats
 
 const sigmoid = (x) => 1 / (1 + Math.exp(-x));
 const clampN = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -37,6 +38,15 @@ const asId = (v) => (v == null ? null : String(v && v._id ? v._id : v));
 
 // Reactivity series (most → least reactive) for the crude metal-displacement check.
 const REACTIVITY_ORDER = ["K", "Na", "Li", "Ca", "Mg", "Al", "C", "Zn", "Fe", "Pb", "H", "Cu", "Ag", "Au", "Pt"];
+
+// The chemicals the CURRENT task (or its parent step) asks the student to use — adding one of these is
+// expected behaviour, never evidence of a misconception. Uses the practical's authored expectations.
+const taskExpectedChemicalIds = (ctx) => {
+  const step = (ctx.experiment.steps || []).find((s) => s.stepId === ctx.task.stepId);
+  if (!step) return new Set();
+  const ms = (step.microSteps || []).find((m) => m.microStepId === ctx.task.microStepId);
+  return new Set([...(step.requiredChemicalsForStep || []), ...((ms && ms.expectedChemicalsForStep) || [])].map(asId));
+};
 
 // ── Predicate registry ───────────────────────────────────────────────────────────────────────
 // Each predicate: (ctx) => boolean, where ctx = { action, actionIndex, priorActions, recentActions,
@@ -56,7 +66,9 @@ const PREDICATES = {
     ["probe_measure", "read_measurement"].includes(ctx.action.actionType) &&
     /thermomet/i.test(ctx.action.equipment || ""),
 
-  // CHEM_003 — recording a pH-7 reading as "the endpoint".
+  // CHEM_003 — reading pH ≈ 7 while RECORDING the result. WEAK, CORROBORATING evidence only: for a strong
+  // acid + strong base pH 7 IS the correct end-point, so this cannot separate the misconception from correct
+  // practice there (the concept inventory is the primary measure of CHEM_003). Signature weight is kept low.
   ph7_recorded_as_endpoint: (ctx) =>
     ctx.action.actionType === "probe_measure" &&
     /ph/i.test(String(ctx.action.unit || "")) &&
@@ -64,25 +76,33 @@ const PREDICATES = {
     Number(ctx.action.quantity) >= 6.8 &&
     Number(ctx.action.quantity) <= 7.2,
 
-  // CHEM_004 — combining substances that produce no reaction, on a mix/add task.
-  combined_non_reacting_substances: (ctx) => ctx.action.resultType === "no_reaction",
+  // CHEM_004 — combining substances that produce no reaction, expecting one. NOT counted when the student
+  // added an indicator (which is added to *signal* a change, not to react — a "no reaction" result is normal)
+  // or a chemical the current task itself asks for. Needs the chemical lookup to tell indicators apart.
+  combined_non_reacting_substances: (ctx) => {
+    if (ctx.action.resultType !== "no_reaction" || !ctx.chemicalsById) return false;
+    const ids = (ctx.action.chemicalIds || []).map(asId);
+    if (!ids.length) return false;
+    if (ids.some((id) => (ctx.chemicalsById[id] || {}).category === "indicator")) return false;
+    const expected = taskExpectedChemicalIds(ctx);
+    return !ids.some((id) => expected.has(id));
+  },
 
-  // CHEM_001 — adding the titrant/reagent before the indicator, when an indicator is expected.
+  // CHEM_001 — bringing the SECOND reactant in before the indicator. The correct titration order is
+  // analyte → indicator → titrant, so adding the acid first (or the base first, if the base is the analyte)
+  // is correct and must NOT count; only an acid AND a base meeting with no indicator present does.
   reagent_added_before_indicator: (ctx) => {
     if (!ctx.chemicalsById) return false;
     const cat = (id) => (ctx.chemicalsById[asId(id)] || {}).category;
     const ids = ctx.action.chemicalIds || [];
-    const addsIndicatorNow = ids.some((id) => cat(id) === "indicator");
-    if (addsIndicatorNow) return false;
-    const addsReagentNow = ["add_chemical", "dispense", "pour"].includes(ctx.action.actionType) && ids.length > 0;
-    if (!addsReagentNow) return false;
-    const indicatorExpected = (ctx.experiment.requiredChemicals || []).some((rc) => {
-      const c = ctx.chemicalsById[asId(rc.chemical || rc)];
-      return c && c.category === "indicator";
-    });
+    if (!["add_chemical", "dispense", "pour"].includes(ctx.action.actionType) || ids.length === 0) return false;
+    const indicatorExpected = (ctx.experiment.requiredChemicals || []).some((rc) => cat(rc.chemical || rc) === "indicator");
     if (!indicatorExpected) return false;
-    const indicatorAlreadyAdded = ctx.priorActions.some((a) => (a.chemicalIds || []).some((id) => cat(id) === "indicator"));
-    return !indicatorAlreadyAdded;
+    const seenBefore = (category) => ctx.priorActions.some((a) => (a.chemicalIds || []).some((id) => cat(id) === category));
+    if (seenBefore("indicator")) return false; // indicator already in — the order was respected
+    const addsAcid = ids.some((id) => cat(id) === "acid");
+    const addsBase = ids.some((id) => cat(id) === "base");
+    return (addsBase && seenBefore("acid")) || (addsAcid && seenBefore("base"));
   },
 
   // CHEM_005 — choosing a metal that is NOT more reactive than the salt's metal for a displacement.
@@ -322,7 +342,7 @@ function computeStudentModel({
   for (const code of relevantCodes) {
     const authoredPrior = (signaturesByCode[code] || {}).behaviouralPriorLogOdds;
     const prior = priorOverride[code] ?? (authoredPrior == null ? DEFAULT_PRIOR_LOG_ODDS : authoredPrior);
-    state[code] = { logOdds: prior, evidence: [], matchCounts: {} };
+    state[code] = { logOdds: prior, evidence: [], matchCounts: {}, contributed: {} };
   }
 
   const bench = newBenchState();
@@ -357,7 +377,13 @@ function computeStudentModel({
 
         const n = (state[code].matchCounts[sig.predicate] = (state[code].matchCounts[sig.predicate] || 0) + 1);
         const baseLlr = llrOverride[sig.predicate] ?? (sig.logLikelihoodRatio || 1.0);
-        const delta = baseLlr / n; // damped repeat
+        // Damped repeat (LLR/n) AND a hard ceiling on what ONE signature can ever contribute. LLR/n is a
+        // harmonic series, so without the ceiling twenty repeats of the same slip still add ≈3.6×LLR and
+        // can carry a weak signal to ~97%. The same behaviour repeated is one piece of evidence seen
+        // many times, not many independent pieces.
+        const already = state[code].contributed[sig.predicate] || 0;
+        const delta = Math.max(0, Math.min(baseLlr / n, MAX_SIGNATURE_MULTIPLE * baseLlr - already));
+        state[code].contributed[sig.predicate] = already + delta;
         state[code].logOdds = clampN(state[code].logOdds + delta, -LOG_ODDS_CLAMP, LOG_ODDS_CLAMP);
         if (state[code].evidence.length < MAX_EVIDENCE_PER_CODE) {
           state[code].evidence.push({
@@ -449,6 +475,7 @@ module.exports = {
   annotateActionsWithTask,
   PREDICATES,
   DEFAULT_PRIOR_LOG_ODDS,
+  MAX_SIGNATURE_MULTIPLE,
   DIAGNOSE_THRESHOLD,
   INTERVENE_THRESHOLD,
   _internal: { sigmoid, expectedIntentFor, resolveRelevantCodes, inferCluster, taskForAction, computeSubGoal, currentStepExpectedSets },

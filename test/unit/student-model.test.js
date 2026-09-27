@@ -69,18 +69,29 @@ test("CHEM_002 — using a thermometer to read the endpoint raises its posterior
   assert.ok(P(model, "CHEM_002") >= 0.55, `got ${P(model, "CHEM_002")}`);
 });
 
-// ── CHEM_003 — pH 7 recorded as the endpoint ─────────────────────────────────────────────────
-test("CHEM_003 — recording pH 7 as the endpoint raises its posterior", () => {
+// ── CHEM_003 — pH 7 recorded as the endpoint (WEAK, corroborating-only signal) ────────────────
+// pH 7 is the CORRECT end-point for strong acid + strong base, so behaviour alone must never be enough to
+// diagnose CHEM_003 there — the concept inventory is the primary measure.
+test("CHEM_003 — recording pH 7 nudges the posterior up but can NEVER reach a diagnosis on its own", () => {
   const scn = buildScenario({
     relevantCodes: ["CHEM_003", "CHEM_002"],
     phases: [
-      { intent: "MEASURE_RESULT", actions: [{ actionType: "probe_measure", equipment: "ph_meter", quantity: 7.0, unit: "pH" }] },
-      { intent: "RECORD_RESULT", actions: [{ actionType: "probe_measure", equipment: "ph_meter", quantity: 6.9, unit: "pH" }] },
+      { intent: "RECORD_RESULT", actions: Array.from({ length: 12 }, () => ({ actionType: "probe_measure", equipment: "ph_meter", quantity: 7.0, unit: "pH" })) },
     ],
   });
   const model = compute(scn);
-  assert.ok(P(model, "CHEM_003") >= 0.6, `got ${P(model, "CHEM_003")}`);
-  assert.equal(model.misconceptions[0].code, "CHEM_003");
+  const prior = svc._internal.sigmoid(model.misconceptions.find((m) => m.code === "CHEM_003").priorLogOdds);
+  assert.ok(P(model, "CHEM_003") > prior, "moves above its prior");
+  assert.ok(P(model, "CHEM_003") < svc.DIAGNOSE_THRESHOLD, `must stay below the diagnosis threshold, got ${P(model, "CHEM_003")}`);
+  assert.equal(svc.diagnose({ studentModel: model, signaturesByCode }).length, 0);
+});
+
+test("CHEM_003 — a pH-7 reading while merely MEASURING (not recording) is not evidence", () => {
+  const scn = buildScenario({
+    relevantCodes: ["CHEM_003"],
+    phases: [{ intent: "MEASURE_RESULT", actions: [{ actionType: "probe_measure", equipment: "ph_meter", quantity: 7.0, unit: "pH" }] }],
+  });
+  assert.equal(compute(scn).misconceptions[0].evidence.length, 0);
 });
 
 test("CHEM_003 — a pH reading well away from 7 does NOT fire it", () => {
@@ -103,22 +114,74 @@ test("CHEM_004 — a no_reaction result on a mix task raises its posterior", () 
       ] },
     ],
   });
-  const model = compute(scn);
+  const model = compute(scn, chemicals);
   assert.ok(P(model, "CHEM_004") >= 0.6, `got ${P(model, "CHEM_004")}`);
 });
 
-// ── CHEM_001 — reagent added before the indicator ────────────────────────────────────────────
-test("CHEM_001 — adding the base before the indicator raises its posterior", () => {
+test("CHEM_004 — adding the INDICATOR (a normal 'no reaction') is never evidence", () => {
+  const scn = buildScenario({
+    relevantCodes: ["CHEM_004"],
+    phases: [
+      { intent: "ADD_REAGENT", actions: Array.from({ length: 4 }, () => ({ actionType: "dispense", equipment: "dropper", chemicalIds: ["phph"], resultType: "no_reaction" })) },
+    ],
+  });
+  assert.equal(compute(scn, chemicals).misconceptions[0].evidence.length, 0);
+});
+
+test("CHEM_004 — a chemical the current task itself asks for is never evidence", () => {
+  const scn = buildScenario({
+    relevantCodes: ["CHEM_004"],
+    phases: [{ intent: "ADD_REAGENT", expectedChemicals: ["naoh"], actions: [{ actionType: "dispense", equipment: "dropper", chemicalIds: ["naoh"], resultType: "no_reaction" }] }],
+  });
+  assert.equal(compute(scn, chemicals).misconceptions[0].evidence.length, 0);
+});
+
+test("CHEM_004 — without the chemical lookup it stays silent rather than guessing", () => {
+  const scn = buildScenario({
+    relevantCodes: ["CHEM_004"],
+    phases: [{ intent: "MIX_SUBSTANCES", actions: [{ actionType: "add_chemical", equipment: "beaker", chemicalIds: ["water"], resultType: "no_reaction" }] }],
+  });
+  assert.equal(compute(scn).misconceptions[0].evidence.length, 0);
+});
+
+// ── CHEM_001 — the SECOND reactant brought in before the indicator ───────────────────────────
+test("CHEM_001 — base added to the acid with NO indicator present raises its posterior", () => {
   const scn = buildScenario({
     relevantCodes: ["CHEM_001"],
     requiredChemicals: [{ chemical: "hcl" }, { chemical: "naoh" }, { chemical: "phph" }],
     phases: [
       { intent: "ADD_REAGENT", actions: [{ actionType: "add_chemical", equipment: "beaker", chemicalIds: ["hcl"] }] },
-      { intent: "ADD_REAGENT", actions: [{ actionType: "add_chemical", equipment: "beaker", chemicalIds: ["naoh"] }] },
+      // base added drop by drop, still no indicator
+      { intent: "ADD_REAGENT", actions: Array.from({ length: 3 }, () => ({ actionType: "dispense", equipment: "dropper", chemicalIds: ["naoh"] })) },
     ],
   });
   const model = compute(scn, chemicals);
   assert.ok(P(model, "CHEM_001") >= 0.55, `got ${P(model, "CHEM_001")}`);
+  assert.equal(model.misconceptions[0].evidence.length, 3, "only the base additions count — the acid never does");
+});
+
+test("CHEM_001 — adding ONLY the acid before the indicator is the correct order and never fires (regression)", () => {
+  // Real bug: 20/20 hits in the first live Acid-Base run were the acid dispensed before the indicator.
+  const scn = buildScenario({
+    relevantCodes: ["CHEM_001"],
+    requiredChemicals: [{ chemical: "hcl" }, { chemical: "naoh" }, { chemical: "phph" }],
+    phases: [{ intent: "ADD_REAGENT", actions: Array.from({ length: 20 }, () => ({ actionType: "dispense", equipment: "dropper", chemicalIds: ["hcl"] })) }],
+  });
+  const model = compute(scn, chemicals);
+  assert.equal(model.misconceptions[0].evidence.length, 0);
+  assert.ok(P(model, "CHEM_001") < 0.5);
+});
+
+test("CHEM_001 — symmetric: base as the analyte first, then the acid, before any indicator", () => {
+  const scn = buildScenario({
+    relevantCodes: ["CHEM_001"],
+    requiredChemicals: [{ chemical: "hcl" }, { chemical: "naoh" }, { chemical: "phph" }],
+    phases: [
+      { intent: "ADD_REAGENT", actions: [{ actionType: "add_chemical", equipment: "beaker", chemicalIds: ["naoh"] }] },
+      { intent: "ADD_REAGENT", actions: [{ actionType: "dispense", equipment: "dropper", chemicalIds: ["hcl"] }] },
+    ],
+  });
+  assert.equal(compute(scn, chemicals).misconceptions[0].evidence.length, 1);
 });
 
 test("CHEM_001 — adding the indicator first does NOT fire it", () => {
@@ -419,4 +482,42 @@ test("shouldIntervene — silent when the probable misconception is irrelevant t
   const model = compute(scn);
   const task = { stepId: 1, microStepId: 2, expectedIntent: "RECORD_RESULT" };
   assert.equal(svc.shouldIntervene({ studentModel: model, task, signaturesByCode }).intervene, false);
+});
+
+// ── Regression: the model must stay QUIET on correct procedure ────────────────────────────────
+// First live Acid-Base run scored CHEM_001 97% / CHEM_004 73% from a *correct* run (acid dispensed before
+// the indicator; phenolphthalein "no reaction"). A correct run must now produce no diagnosis at all.
+test("a fully CORRECT acid → indicator → base run raises no diagnosis", () => {
+  const scn = buildScenario({
+    relevantCodes: ["CHEM_001", "CHEM_002", "CHEM_003", "CHEM_004"],
+    requiredChemicals: [{ chemical: "hcl" }, { chemical: "naoh" }, { chemical: "phph" }],
+    phases: [
+      { intent: "SELECT_CONTAINER", actions: [{ actionType: "create_equipment", equipment: "beaker" }] },
+      { intent: "ADD_REAGENT", expectedChemicals: ["hcl"], actions: Array.from({ length: 8 }, () => ({ actionType: "dispense", equipment: "dropper", chemicalIds: ["hcl"] })) },
+      { intent: "ADD_REAGENT", expectedChemicals: ["phph"], actions: Array.from({ length: 3 }, () => ({ actionType: "dispense", equipment: "dropper", chemicalIds: ["phph"], resultType: "no_reaction" })) },
+      { intent: "ADD_REAGENT", expectedChemicals: ["naoh"], actions: Array.from({ length: 6 }, (_, i) => ({ actionType: "dispense", equipment: "dropper", chemicalIds: ["naoh"], resultType: i > 3 ? "reaction_success" : "no_reaction" })) },
+      { intent: "MEASURE_RESULT", actions: [{ actionType: "probe_measure", equipment: "ph_meter", quantity: 7.0, unit: "pH" }] },
+      { intent: "RECORD_RESULT", actions: [{ actionType: "probe_measure", equipment: "ph_meter", quantity: 7.1, unit: "pH" }] },
+    ],
+  });
+  const model = compute(scn, chemicals);
+  for (const code of ["CHEM_001", "CHEM_002", "CHEM_004"]) {
+    assert.equal(model.misconceptions.find((m) => m.code === code).evidence.length, 0, `${code} must not fire on correct procedure`);
+  }
+  for (const m of model.misconceptions) assert.ok(m.probability < 0.5, `${m.code} = ${m.probability}`);
+  assert.deepEqual(svc.diagnose({ studentModel: model, signaturesByCode }), []);
+});
+
+// ── Repeat accumulation is capped ─────────────────────────────────────────────────────────────
+test("one signature repeated 20× cannot carry a misconception past 2×LLR", () => {
+  const scn = buildScenario({
+    relevantCodes: ["CHEM_002"],
+    phases: [{ intent: "ADD_REAGENT", actions: Array.from({ length: 20 }, () => ({ actionType: "heat", equipment: "beaker" })) }],
+  });
+  const model = compute(scn);
+  const m = model.misconceptions[0];
+  const ceiling = svc._internal.sigmoid(m.priorLogOdds + svc.MAX_SIGNATURE_MULTIPLE * 1.4);
+  assert.ok(m.probability <= ceiling + 1e-3, `p=${m.probability} exceeds ceiling ${ceiling.toFixed(3)}`);
+  assert.equal(m.evidence.length, 20, "every hit is still recorded as evidence (the student did do it 20 times)");
+  assert.equal(m.evidence[19].deltaLogOdds, 0, "…but late repeats add nothing once the ceiling is reached");
 });
