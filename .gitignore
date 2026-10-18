@@ -4,3 +4,7 @@ node_modules/
 .DS_Store
 dist/
 coverage/
+
+# Word/Office lock and temp files
+~$*
+~WRL*.tmp
