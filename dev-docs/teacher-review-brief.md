@@ -16,7 +16,9 @@ after. The point is a record that exists outside your memory.
 
 ## Four items to ask about specifically
 
-**Q4** — order of adding acid, indicator, base in a titration (correct: acid → indicator → base).
+**Q4** — order of adding acid, indicator, base in a titration (per the answer key, Q4's correct
+order is base → indicator → acid; Q4 is the "base neutralised by acid" variant — don't confuse it
+with P4, the "acid neutralised by base" variant, whose key answer is acid → indicator → base).
 *Ask:* "Is this the only sensible order for a school titration, or could a different setup also be
 valid?"
 → Proposed answer: No. Both acid → indicator → base and base → indicator → acid can be valid,
