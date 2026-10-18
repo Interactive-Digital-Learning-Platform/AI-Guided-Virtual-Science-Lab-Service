@@ -70,7 +70,10 @@ student data, ever.
 - [ ] Chemistry teacher review → fill `student-model-expert-review-checklist.md`: name, date,
       per-item accept/revise, **is CHEM_003 in the Grade 10/11 syllabus? (Y/N)**, signature review.
 - [ ] Ethics / internal-pilot approval reference recorded in `pilot-data/collection-authorization.csv`.
-- [ ] Parent consent + student assent (see ethics brief); signed copies stored **outside** the repo.
+- [ ] Parent consent + student assent: drafted 2026-10-18 as `pilot-consent-pack-draft.md` — a
+      template with real blanks (supervisor, ethics reference, school, data-storage location),
+      not something to send out yet. Needs supervisor review before use. Signed copies, once this
+      runs for real, stored **outside** the repo.
 - [ ] Recruit **15–20** (need ≥12 per code with ≥2 in each class, and some will drop out).
 - [ ] `node scripts/analysis/pilot-status.js` shows `authorizedToCollect=yes`.
 
@@ -98,17 +101,36 @@ Evidence from your only real Acid-Base run (session `6a94dfad…`):
       late repeats still count as evidence but add nothing.
 - [x] **Negative regression tests** — **done** (105/105): a full correct acid→indicator→base run raises no
       diagnosis; acid-only-before-indicator, indicator-adds and task-expected additions never fire.
-- [ ] **Apply the DB update** (CHEM_003 params live in the DB, not the code):
-      `node src/data/migrations/20260830-behavioural-signatures.js --apply` (dry run shows 3 changes).
-      Then restart the backend — predicate code loads at startup.
+- [x] **Apply the DB update** — done and re-verified 2026-10-18: dry run against the live DB now
+      shows **0 pending changes**, confirming `CHEM_003`'s params are live. Backend restart needed
+      whenever predicate *code* changes (DB migration alone doesn't reload `studentModelService.js`).
 - Verified on the only real Acid-Base run (`6a94dfad…`): CHEM_001 97% → 23%, CHEM_004 73% → 21%, 0
   evidence each, no diagnosis.
+- [x] `inspect-student-model.js --recent 20` — re-run 2026-10-18 against live data (5 real
+      "Acid-Base Neutralization" sessions now in the DB, up from 1):
+      - **CHEM_001, CHEM_004 — keep.** Across all 5 sessions, including the two where the RULE
+        engine still fires, the MODEL now stays silent (0 evidence each). Fix generalises past the
+        one session it was built from.
+      - **CHEM_002 — keep, no change needed.** Fired at 85.8% (7 evidence) on session `6ad470b6…`
+        and 59.9% (1 evidence) on `6a93b49a…` via `heat_during_indicator_or_endpoint_task`.
+        Traced `6ad470b6…` to the live LabRun: 17 "heat" actions, several bursts of 5-6 within
+        2 seconds, all with null chemicalIds/quantity/temperature, logged 2026-10-18 — and the
+        session's `userId` resolves to the researcher's own account
+        (`manushiliyanage14@gmail.com`). This is dev UI exploration (rapid test-clicking a heat
+        control), not a real student's reasoning, so the high score is correct behaviour, not a
+        predicate bug — it's just evidence from a session that was never a real participant.
+        **Worth noting for Phase 4:** the per-signature cap (`MAX_SIGNATURE_MULTIPLE`) kept 17
+        repeated clicks from pushing the posterior past what 2×LLR allows, which is exactly the
+        damping it was built for.
+      - **CHEM_003 — keep, pending the teacher's scope decision** (unchanged; see Phase 1).
+- [x] Signature `source` notes already updated (commit `f54fccb`); `npm test` green — **105/105**,
+      re-run 2026-10-18.
 - [ ] **Researcher-enacted scenarios** in the real app: 1 fully-correct run + 1 run enacting each of
       CHEM_001–004. Label them "researcher-enacted test scenarios" — they validate signature
       sensitivity/specificity only, are **not** participant data, and have no labels so they never
       enter the fit. Gate: correct run → no code > 0.55; each enacted run → its code > 0.55.
-- [ ] `inspect-student-model.js --recent 20`; each code marked keep / revise / drop with a reason.
-- [ ] Update each signature's `source` note; `npm test` green; commit.
+      **Still open — needs someone to actually operate the app** (mobile UI or a scripted API
+      client); nothing here to do without that.
 
 ## Phase 3 — Deploy & shadow smoke test (Sep 25–27)
 
