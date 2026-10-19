@@ -1,0 +1,11 @@
+# Allow-list: the build context is ONLY what the image needs, so local .env files and
+# participant data (pilot-data/, sessions.json) can never reach an image by accident.
+*
+
+!package.json
+!package-lock.json
+!src/
+
+**/.env
+**/.env.*
+**/.DS_Store

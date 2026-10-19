@@ -9,8 +9,8 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
     }
 
-    // Bypass authentication for development/testing
-    if (token === "bypass-token-123") {
+    // Bypass authentication for development/testing (never outside NODE_ENV=development)
+    if (process.env.NODE_ENV === "development" && token === "bypass-token-123") {
       console.log("[AUTH] Bypass token detected");
       let user = await User.findOne({ email: "testuser@example.com" });
       if (!user) {
