@@ -8,3 +8,10 @@ coverage/
 # Word/Office lock and temp files
 ~$*
 ~WRL*.tmp
+
+# Real participant data (minors) — names/schools, raw Google Forms exports, and the
+# name<->participantCode key must never be committed. Only de-identified, code-keyed
+# response files belong in version control, and even those need a deliberate decision first.
+/dev-docs/google-forms/
+/pilot-data/raw/
+/pilot-data/participant-key-PRIVATE.csv

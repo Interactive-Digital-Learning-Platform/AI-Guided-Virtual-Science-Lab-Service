@@ -67,15 +67,50 @@ student data, ever.
 
 ## Phase 1 — External gates (start Sep 21; these are the long poles)
 
-- [ ] Chemistry teacher review → fill `student-model-expert-review-checklist.md`: name, date,
-      per-item accept/revise, **is CHEM_003 in the Grade 10/11 syllabus? (Y/N)**, signature review.
-- [ ] Ethics / internal-pilot approval reference recorded in `pilot-data/collection-authorization.csv`.
-- [ ] Parent consent + student assent: drafted 2026-10-18 as `pilot-consent-pack-draft.md` — a
-      template with real blanks (supervisor, ethics reference, school, data-storage location),
-      not something to send out yet. Needs supervisor review before use. Signed copies, once this
-      runs for real, stored **outside** the repo.
-- [ ] Recruit **15–20** (need ≥12 per code with ≥2 in each class, and some will drop out).
-- [ ] `node scripts/analysis/pilot-status.js` shows `authorizedToCollect=yes`.
+- [x] **Chemistry teacher review — done 2026-10-19.** Signed PDF (`teacher-review-Signed
+      -PDF.pdf`): real handwritten signature, name/school/subject filled in. Verdict: "Approved as
+      written." Scope question: **Yes — CHEM_003 stays in** (confirms Grade 10/11 syllabus scope).
+- [ ] Ethics / internal-pilot approval reference recorded in `pilot-data/collection-authorization.csv`
+      — still not obtained. **Note:** a first real response batch was already collected (below)
+      before this gate cleared — flag this timing to your supervisor when you discuss ethics sign-off.
+- [ ] Parent consent + student assent: drafted 2026-10-18 as `pilot-consent-pack-draft.md`, never
+      finalised/supervisor-reviewed. The Google Form that was actually used did **not** include the
+      consent/assent sections from the design (see below) — unclear whether consent was collected
+      by some other means (paper, verbal) before administering it. Confirm and record how.
+- [x] Recruit — **first batch collected 2026-10-18/19**, 17 pre-test + 18 post-test responses (see
+      Phase 4 below). Within the 15-20 target by headcount; coverage caveats below.
+- [ ] `pilot-status.js` doesn't exist (pre-M7 revert) — readiness checked by hand instead (below).
+
+### First collection batch — results (2026-10-19)
+
+Collected via the Google Forms built from `pilot-collection-google-forms.md`, but **not built
+to that exact spec**: no participant-code field (joined by name+school instead — messy, see
+`pilot-data/participant-key-PRIVATE.csv`, gitignored), and **only a subset of items**, different
+per form:
+- Form A (pre) asked items **1, 2, 3, 8, 9, 10**.
+- Form B (post) asked items **1, 2, 3, 4, 5, 6**.
+- Only **items 1–3 are common to both forms** — the other 9 items (P5-7,P11-15 / Q7-15) were
+  never administered. Processed with `scripts/analysis/process-collected-pilot-data.js` (content-
+  matches free-text answers to A-D/i-iv, de-identifies into `pilot-data/responses-{A,B}.csv` +
+  a private name-key). Low-confidence cells are left blank, never guessed.
+
+**What's usable:**
+- 13 students have a matched pre+post pair. Paired (same-student) comparison on items 1-3:
+  - item 1 (CHEM_002): 5/13 → 13/13 correct, 8 gained, 0 lost.
+  - item 2 (CHEM_003): 0/13 → 12/13 correct, 12 gained, 0 lost — strong signal, and directly
+    matches what the teacher just confirmed is in-scope.
+  - item 3 (CHEM_004): 5/13 → 11/13 correct, 7 gained, 1 lost.
+- Single-form item-level stats (difficulty/discrimination/Cronbach's α) for items 4,5,6 (Form B
+  only) and 8,9,10 (Form A only) — real, usable diagnostics, just not paired.
+
+**What's NOT usable, and why:** the §7.2 "≥2-of-3 items flag the code" misconception-label rule
+needs real signal from all 3 of a code's items. Every code here has at most 1-2 of its 3 items
+administered (CHEM_001 worst: item 8 pre, item 4 post — not even the same item, so the two forms
+can't even agree on which single item to trust). **Decision (2026-10-19, with the researcher):
+treat this as a partial pilot** — items 1-3's paired gain and the single-form item diagnostics
+are real, reportable findings; full CHEM_001-004 calibration is **not estimable** from this
+batch, consistent with the checklist's own fallback plan. If/when more data is collected, build
+the form(s) to the full 15-item spec with a real participant-code field so this gap doesn't repeat.
 
 ## Phase 2 — Code work that needs no student data (Sep 21–25, parallel with Phase 1)
 
