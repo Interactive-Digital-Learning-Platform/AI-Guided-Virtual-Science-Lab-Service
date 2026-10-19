@@ -1,0 +1,12 @@
+# Allowlist: ignore everything, then re-include only what the image needs.
+# This keeps real participant data (pilot-data/, dev-docs/google-forms/), research
+# docs, analysis scripts, tests and local .env files out of the build context entirely.
+*
+
+!package.json
+!package-lock.json
+!src/
+
+# Never ship env files, even if one is added under src/ later.
+**/.env
+**/.env.*
