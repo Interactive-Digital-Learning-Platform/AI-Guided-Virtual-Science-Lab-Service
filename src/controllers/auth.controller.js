@@ -1,26 +1,39 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { verifyClerkToken } = require("../middleware/clerkAuth");
 
 const generateToken = (userId) =>
   jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
 
 // POST /api/auth/sync
-// Called by mobile app after Clerk sign-in to sync user to MongoDB & get backend JWT
+// Called by mobile app after Clerk sign-in to sync user to MongoDB & get backend JWT.
+// Requires the Clerk session token as the Bearer token; the clerkId is taken from it, not the body.
 const syncUser = async (req, res, next) => {
   try {
-    const { clerkId, name, email, grade, school } = req.body;
+    const header = req.headers.authorization || "";
+    if (!header.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, message: "Access denied. No Clerk session token provided." });
+    }
+    let clerkId;
+    try {
+      clerkId = (await verifyClerkToken(header.slice(7))).sub;
+    } catch (error) {
+      console.warn("[AUTH] Clerk token rejected:", error.message);
+      return res.status(401).json({ success: false, message: "Clerk session could not be verified. Please sign in again." });
+    }
 
-    if (!clerkId || !email || !name) {
-      return res.status(400).json({ success: false, message: "clerkId, name, and email are required." });
+    const { name, email, grade, school } = req.body;
+
+    if (!email || !name) {
+      return res.status(400).json({ success: false, message: "name and email are required." });
     }
 
     let user = await User.findOne({ clerkId });
 
-    if (!user) {
-      // Fall back to matching by email so re-syncing under a new clerkId
-      // (e.g. Clerk account reset) re-links the existing record instead of
-      // colliding with the unique email index.
-      user = await User.findOne({ email: email.toLowerCase() });
+    // The email in the body is unverified, so it must never re-link a record owned by another
+    // Clerk user (that would hand over their account).
+    if (!user && (await User.exists({ email: email.toLowerCase() }))) {
+      return res.status(409).json({ success: false, message: "This email is already linked to another account." });
     }
 
     if (user) {

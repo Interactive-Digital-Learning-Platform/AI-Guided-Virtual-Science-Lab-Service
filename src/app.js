@@ -21,9 +21,11 @@ const biologyRoutes = require("./routes/biology.routes");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Requests arrive through the nginx API gateway (one hop), which sets X-Forwarded-For.
-// Trusting it lets express-rate-limit key on the real client IP instead of the gateway's.
-app.set("trust proxy", 1);
+// Requests arrive through the nginx API gateway, which sets X-Forwarded-For. Trusting it lets
+// express-rate-limit key on the real client IP instead of the gateway's. Locally that's one hop;
+// on Azure Container Apps the ingress in front of the gateway and of this app add one each, so
+// TRUST_PROXY_HOPS is set there.
+app.set("trust proxy", parseInt(process.env.TRUST_PROXY_HOPS || "1", 10));
 
 // Connect to MongoDB
 connectDB();
