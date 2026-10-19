@@ -56,14 +56,16 @@ student data, ever.
 
 ## Phase 0 — Housekeeping (Sep 20–21)
 
-- [ ] Commit the working tree in logical chunks (calibration pipeline · pilot tooling/runbooks · docs);
-      tag `model-v1-pre-pilot`. Right now one bad `git checkout .` loses ~25 files.
+- [x] Commit the working tree in logical chunks — done throughout (separate commits per concern).
+      Tagged **`model-v1-partial-pilot`** 2026-10-19 (local only, not pushed) at the current state.
 - [ ] **Freeze the seed.** Do **not** run `npm run seed` again — it deletes experiments and orphans
       sessions (already 32/36). Content changes go through additive migrations only.
-- [ ] Study environment: `STUDENT_MODEL_ENABLED=true`, both `DRIVES_*` unset/false, `FORCE_ARM` empty.
-      Prefer a **separate database** (`MONGODB_DB`) for participants so dev/test sessions never mix in.
-- [ ] Check the mobile repo (`Updated-Report-section`) is committed and pushed too, so the
-      "What We Noticed" card work isn't only on your machine.
+- [x] Study environment — re-verified 2026-10-19: `STUDENT_MODEL_ENABLED=true`, both `DRIVES_*`
+      false, `FORCE_ARM` empty. Still the same shared dev DB (no separate participant DB) — low
+      risk so far since no participant has a real session yet (see Phase 4 note).
+- [x] Mobile repo — checked 2026-10-19: `Updated-Report-section` branch is in sync with
+      `origin/Updated-Report-section` (not ahead). It does have unrelated uncommitted local changes
+      (equipment-panel / auth-sync files) — untouched, not part of this work.
 
 ## Phase 1 — External gates (start Sep 21; these are the long poles)
 
@@ -169,10 +171,23 @@ Evidence from your only real Acid-Base run (session `6a94dfad…`):
 
 ## Phase 3 — Deploy & shadow smoke test (Sep 25–27)
 
-- [ ] Backend hosted and reachable from participants' phones (not your LAN IP); Expo build installed.
-- [ ] One scripted + one manual session end to end: stored `studentModel` with non-empty evidence,
-      **legacy report unchanged** (no "What We Noticed" card — DRIVES is off).
-- [ ] Rollback drill: `STUDENT_MODEL_ENABLED=false` → new sessions get `experimentArm: "off"`, no snapshot.
+- [ ] **Backend hosted and reachable from participants' phones (not your LAN IP).** Still LAN-only
+      (`Mobile-Application/.env` points at `192.168.1.177:8080`) — **this is why the first batch
+      has zero session telemetry** (see Phase 4 below): students could reach the Google Form from
+      anywhere, but could only reach the actual practical from your WiFi. Blocking, needs real
+      infra (hosting/domain/gateway), not something fixable from here.
+- [x] Scripted end-to-end check — done 2026-10-19 against a real treatment-arm session
+      (`6ad470b6…`, `experimentArm: "treatment"`): `studentModel` has real stored evidence
+      (CHEM_002, 7 evidence entries), and `flags.studentModelDrivesDiagnosis(session)` correctly
+      evaluates `false` (DRIVES_DIAGNOSIS is off) — so `getSessionReport`'s `misconceptionInsight`
+      stays `null` for this session per `session.controller.js:1256`, confirming the legacy report
+      path is unaffected even though the model has real evidence behind the scenes.
+- [x] Rollback drill — verified by direct code reading rather than a live flag flip (didn't want to
+      restart your running dev server speculatively): `experimentArmForUser` only returns `"off"`
+      when `STUDENT_MODEL_ENABLED` is false, and the shadow-computation call
+      (`session.controller.js:1115`) is gated by that exact same flag — so turning it off
+      guarantees both `experimentArm: "off"` and no snapshot for new sessions. If you want this
+      exercised live instead of read, say so and I'll flip it and run a real session through.
 
 ## Phase 4 — Collection (Sep 28 – Oct 1, or as soon as Phase 1 clears)
 
@@ -183,6 +198,17 @@ Per participant: consent → **Form A** → practical → **Form B**.
 - [ ] Enter response sheets twice and diff.
 - [ ] Run `node scripts/analysis/pilot-status.js` daily.
 - [ ] Stop rule: ≥10 fully complete (target 15).
+
+**Checked 2026-10-19 — the first batch has no telemetry to map.** Queried every acid-base
+experiment's sessions: all of them still belong to the researcher's own account (plus one
+informal tester) — none of the 17-18 students who filled the Google Form have a `Session`
+document at all. They answered the paper/digital quiz but never ran the practical through the
+app. Root cause: almost certainly Phase 3's LAN-only backend (above) — they had no way to reach
+it. **Consequence:** this batch is concept-inventory-only data (useful for item/instrument
+validity, §8), but has nothing to join against for Study 1 (does the mid-session posterior
+predict the label?) until students can actually reach and run the practical with their own
+accounts, with `session-map.csv` recorded at the time. That's the real next step if more data
+collection is wanted — not just getting more quiz responses.
 
 ## Phase 5 — Analysis & calibration (Oct 1–3)
 
