@@ -21,6 +21,10 @@ const biologyRoutes = require("./routes/biology.routes");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Requests arrive through the nginx API gateway (one hop), which sets X-Forwarded-For.
+// Trusting it lets express-rate-limit key on the real client IP instead of the gateway's.
+app.set("trust proxy", 1);
+
 // Connect to MongoDB
 connectDB();
 
