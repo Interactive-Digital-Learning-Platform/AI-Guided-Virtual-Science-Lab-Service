@@ -19,6 +19,12 @@ const userSchema = new mongoose.Schema(
       lastActiveDate: { type: Date },
     },
     preferredSubjects: [{ type: String, enum: ["Physics", "Chemistry", "Biology"] }],
+    // Lightweight per-user cost guard on AI visualization generation (POST /api/biology/generate)
+    // — there's no other rate limiting on Groq calls anywhere in this backend. Stored as a plain
+    // "YYYY-MM-DD" string rather than a Date so "is it still today" is a simple string compare,
+    // no timezone-aware date-math needed.
+    dailyGenerationCount: { type: Number, default: 0 },
+    dailyGenerationDate: { type: String, default: null },
   },
   { timestamps: true }
 );

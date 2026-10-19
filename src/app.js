@@ -14,10 +14,16 @@ const sessionRoutes = require("./routes/session.routes");
 const feedbackRoutes = require("./routes/feedback.routes");
 const analyticsRoutes = require("./routes/analytics.routes");
 const chemicalRoutes = require("./routes/chemical.routes");
+const mediaRoutes = require("./routes/media.routes");
 const labRoutes = require("./routes/lab.routes");
+const biologyRoutes = require("./routes/biology.routes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Requests arrive through the nginx API gateway (one hop), which sets X-Forwarded-For.
+// Trusting it lets express-rate-limit key on the real client IP instead of the gateway's.
+app.set("trust proxy", 1);
 
 // Connect to MongoDB
 connectDB();
@@ -66,7 +72,9 @@ app.use("/api/sessions", sessionRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/chemicals", chemicalRoutes);
+app.use("/api/media", mediaRoutes);
 app.use("/api/lab", labRoutes);
+app.use("/api/biology", biologyRoutes);
 
 // 404 handler
 app.use((req, res) => {

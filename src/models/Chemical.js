@@ -26,7 +26,17 @@ const chemicalSchema = new mongoose.Schema(
     isBuildableFromElements: { type: Boolean, default: false },
     buildReactionId: { type: mongoose.Schema.Types.ObjectId, ref: "Reaction", default: null },
     state: { type: String, enum: ["solid", "liquid", "gas", "aqueous"], required: true },
-    color: { type: String, default: "#FFFFFF" }, // hex, used for bottle/liquid tint in UI
+    color: { type: String, default: "#FFFFFF" }, // hex — CARD / bottle-tint artwork colour only
+    // How the substance actually LOOKS as the material in a vessel (test tube / beaker), as
+    // opposed to `color` above (illustrative card tint). Data-driven so UI components never pick
+    // a colour themselves — see src/data/chemicalAppearance.js (the source table, materialised
+    // here at seed time) and services/appearanceService.js (the reaction/indicator engine).
+    appearance: {
+      solutionColor: { type: String, default: null }, // hex the liquid fill renders as
+      opacity: { type: Number, default: null }, // 0..1 — colourless liquids stay low but > 0
+      phase: { type: String, default: null }, // solution | liquid | solid | gas | powder | crystals | metal
+      texture: { type: String, default: null }, // clear | cloudy | opaque | metallic | granular
+    },
     concentration: { type: String, default: null }, // e.g. "1M", "dilute", "concentrated"
     // Curated only for liquid/aqueous chemicals where pH is meaningful — see phService.js, which
     // falls back to a category-based estimate when this is unset. Null for solids/gases/elements.
@@ -39,6 +49,20 @@ const chemicalSchema = new mongoose.Schema(
     hazardInfo: [{ type: String }],
     commonUses: [{ type: String }],
     iconKey: { type: String, default: null }, // maps to a mobile-side sprite/asset key
+    // Remote illustration for this element/compound. Storage-agnostic reference only — never the
+    // binary itself. `provider` decides how mediaService turns it into a public URL:
+    //   "minio"     -> streamed through GET /api/media/chemicals/:id (object lives in `key`)
+    //   "s3"/"cloudinary" -> `url` is a ready public/CDN URL, served to the client as-is
+    // The mobile app only ever receives the resolved `imageUrl` string (see chemical.controller),
+    // so moving the binary to S3/Cloudinary later is a backend-only change.
+    artwork: {
+      provider: { type: String, enum: ["minio", "s3", "cloudinary", null], default: null },
+      key: { type: String, default: null }, // object key within the media bucket (minio/s3)
+      url: { type: String, default: null }, // absolute CDN/public URL (s3 public / cloudinary)
+      altText: { type: String, default: null },
+      width: { type: Number, default: null },
+      height: { type: Number, default: null },
+    },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

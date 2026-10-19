@@ -9,8 +9,38 @@ const misconceptionsData = require("./misconceptions");
 const experimentsData = require("./experiments");
 const chemicalsData = require("./chemicals");
 const reactionsData = require("./reactions");
+const { withAppearance } = require("./chemicalAppearance");
 const chemistryPracticalsData = require("./chemistryPracticals");
+const physicsPracticalsData = require("./physicsPracticals");
+const biologyVisualizationsData = require("./biologyVisualizations");
+const BiologyVisualization = require("../models/BiologyVisualization");
 const { buildReactantKey } = require("../services/reactionEngine");
+
+// Precomputed textbook lesson/page map (npm run curriculum:sync — see scripts/curriculum/). Optional
+// — absent until the sync job has run. Re-seeding wipes Experiment.curriculumRefs, so this file is
+// the durable copy that survives a re-seed; the sync job can also be re-run against a fresh DB.
+let curriculumRefsMap = {};
+try {
+  curriculumRefsMap = require("./curriculum/curriculumRefs.generated.json");
+  console.log(`📖 Loaded curriculum refs for ${Object.keys(curriculumRefsMap).length} practical(s)`);
+} catch {
+  console.log("📖 No curriculum refs file (npm run curriculum:sync not run yet) — skipping");
+}
+
+// Attaches curriculumRefs (experiment- and step-level) to a resolved practical, by title.
+const withCurriculumRefs = (practical) => {
+  const entry = curriculumRefsMap[practical.title];
+  if (!entry) return practical;
+  return {
+    ...practical,
+    curriculumRefs: entry.experimentRefs || [],
+    curriculumRefsGeneratedAt: entry.generatedAt ? new Date(entry.generatedAt) : new Date(),
+    steps: (practical.steps || []).map((step) => ({
+      ...step,
+      curriculumRefs: (entry.steps && entry.steps[String(step.stepId)]) || [],
+    })),
+  };
+};
 
 const seed = async () => {
   try {
@@ -24,6 +54,7 @@ const seed = async () => {
       Concept.deleteMany({}),
       Chemical.deleteMany({}),
       Reaction.deleteMany({}),
+      BiologyVisualization.deleteMany({}),
     ]);
     console.log("🗑️  Cleared existing seed data");
 
@@ -33,8 +64,11 @@ const seed = async () => {
 
     // Seed Concepts
     const concepts = await Concept.insertMany([
-      { name: "Density", subject: "Physics", grades: [7, 8, 9], description: "Mass per unit volume of a substance.", simpleExplanation: "How heavy something is for its size. Dense = heavy and small.", relatedMisconceptions: ["PHY_001", "PHY_002"], visualizationAvailable: false, keywords: ["mass", "volume", "density"] },
-      { name: "Ohm's Law", subject: "Physics", grades: [9, 10, 11], description: "V = IR — voltage equals current times resistance.", simpleExplanation: "More resistance = less current for the same voltage.", relatedMisconceptions: ["PHY_003", "PHY_004"], visualizationAvailable: false, keywords: ["voltage", "current", "resistance"] },
+      { name: "Density", subject: "Physics", grades: [7, 8, 9, 10, 11], description: "Mass per unit volume of a substance.", simpleExplanation: "How heavy something is for its size. Dense = heavy and small.", relatedMisconceptions: ["PHY_001", "PHY_002", "PHY_015", "PHY_016"], visualizationAvailable: false, keywords: ["mass", "volume", "density"] },
+      { name: "Ohm's Law", subject: "Physics", grades: [9, 10, 11], description: "V = IR — voltage equals current times resistance.", simpleExplanation: "More resistance = less current for the same voltage.", relatedMisconceptions: ["PHY_003", "PHY_004", "PHY_017", "PHY_018"], visualizationAvailable: false, visualizationType: "ohms_law", keywords: ["voltage", "current", "resistance"] },
+      { name: "Simple Harmonic Motion", subject: "Physics", grades: [10, 11], description: "Periodic motion, such as a pendulum's swing, where the restoring force is proportional to displacement.", simpleExplanation: "A pendulum swings back and forth at a steady rate that depends only on its string length (for small swings) — not on how heavy the bob is or how far you release it.", relatedMisconceptions: ["PHY_010", "PHY_011", "PHY_012"], visualizationAvailable: false, keywords: ["pendulum", "period", "oscillation", "gravity"] },
+      { name: "Hooke's Law", subject: "Physics", grades: [10, 11], description: "The extension of a spring is proportional to the force applied to it, within its elastic limit.", simpleExplanation: "The more you pull a spring, the more it stretches — but only up to a point, and in a straight-line proportion.", relatedMisconceptions: ["PHY_013", "PHY_014"], visualizationAvailable: false, keywords: ["spring", "elasticity", "extension", "force"] },
+      { name: "Series and Parallel Circuits", subject: "Physics", grades: [10, 11], description: "How current, voltage, and resistance behave differently depending on whether components share one loop (series) or separate branches (parallel).", simpleExplanation: "In series, current is the same everywhere and voltage splits up. In parallel, voltage is the same across each branch and current splits up.", relatedMisconceptions: ["PHY_017", "PHY_018", "PHY_019", "PHY_020"], visualizationAvailable: false, keywords: ["series", "parallel", "resistance", "circuit"] },
       { name: "Acid-Base Reactions", subject: "Chemistry", grades: [9, 10, 11], description: "Reactions between acids and bases producing salt and water.", simpleExplanation: "Acids and bases cancel each other out — neutralization.", relatedMisconceptions: ["CHEM_001", "CHEM_002", "CHEM_003"], visualizationAvailable: true, visualizationType: "acid_base", keywords: ["acid", "base", "pH", "neutralization"] },
       { name: "Reactivity Series of Metals", subject: "Chemistry", grades: [9, 10, 11], description: "The order in which metals react, determining which metal can displace another from a compound.", simpleExplanation: "More reactive metals push less reactive metals out of their compounds.", relatedMisconceptions: ["CHEM_005"], visualizationAvailable: false, keywords: ["metal", "reactivity", "displacement"] },
       { name: "Tests for Gases", subject: "Chemistry", grades: [9, 10, 11], description: "Standard laboratory tests used to identify common gases produced in reactions.", simpleExplanation: "Each gas has a specific test that confirms what it is.", relatedMisconceptions: ["CHEM_004"], visualizationAvailable: false, keywords: ["gas", "carbon dioxide", "limewater", "test"] },
@@ -48,7 +82,9 @@ const seed = async () => {
     concepts.forEach((c) => { conceptMap[c.name] = c._id; });
 
     // Seed Chemicals (needed before experiments/reactions, which reference them)
-    const chemicals = await Chemical.insertMany(chemicalsData);
+    // Materialise each chemical's lab appearance (chemicalAppearance.js) onto the doc, so
+    // GET /api/chemicals ships it and the observable-state engine can read it server-side.
+    const chemicals = await Chemical.insertMany(withAppearance(chemicalsData));
     console.log(`✅ Seeded ${chemicals.length} chemicals`);
 
     const chemicalMap = {};
@@ -91,10 +127,10 @@ const seed = async () => {
     );
     console.log(`✅ Linked ${Object.keys(buildableCompoundReactions).length} buildable compounds to their synthesis reactions`);
 
-    // Attach concept IDs to the original generic (Physics/Biology + 2 shallow Chemistry) experiments
+    // Attach concept IDs to the original generic (Biology + 2 shallow Chemistry) experiments.
+    // The legacy generic Physics entries ("Measuring Density", "Ohm's Law Verification") were
+    // removed from experiments.js now that physicsPracticals.js has proper guided replacements.
     const experimentConceptMap = {
-      "Measuring Density": ["Density"],
-      "Ohm's Law Verification": ["Ohm's Law"],
       "Acid-Base Titration": ["Acid-Base Reactions"],
       "Separating Mixtures by Filtration": ["Acid-Base Reactions"],
       "Testing a Leaf for Starch": ["Photosynthesis"],
@@ -125,19 +161,65 @@ const seed = async () => {
         reactionId: reactionSlug ? reactionMap[reactionSlug] || null : null,
         relatedConcepts: conceptNames.map((name) => conceptMap[name]).filter(Boolean),
         steps: steps.map((step) => {
-          const { requiredChemicalsForStepSymbols, ...stepRest } = step;
+          const { requiredChemicalsForStepSymbols, microSteps, ...stepRest } = step;
           return {
             ...stepRest,
             requiredChemicalsForStep: (requiredChemicalsForStepSymbols || []).map((symbol) =>
               resolveChemicalSymbol(symbol, practical.title)
             ),
+            // Resolve each Current Task's own chemical symbols the same way, one level down.
+            microSteps: (microSteps || []).map((microStep) => {
+              const { expectedChemicalsForStepSymbols, ...microStepRest } = microStep;
+              return {
+                ...microStepRest,
+                expectedChemicalsForStep: (expectedChemicalsForStepSymbols || []).map((symbol) =>
+                  resolveChemicalSymbol(symbol, practical.title)
+                ),
+              };
+            }),
           };
         }),
       };
     });
 
-    const experiments = await Experiment.insertMany([...genericExperimentsToInsert, ...chemistryPracticalsToInsert]);
-    console.log(`✅ Seeded ${experiments.length} experiments (${chemistryPracticalsToInsert.length} Chemistry practicals)`);
+    // Resolve the curated Physics practicals — same shape as the chemistry resolution above,
+    // minus chemical-symbol resolution (physics practicals never populate requiredChemicals).
+    const physicsPracticalsToInsert = physicsPracticalsData.map((practical) => {
+      const { conceptNames, steps, ...rest } = practical;
+      return {
+        ...rest,
+        requiredChemicals: [],
+        reactionId: null,
+        relatedConcepts: conceptNames.map((name) => conceptMap[name]).filter(Boolean),
+        steps: steps.map((step) => {
+          const { microSteps, ...stepRest } = step;
+          return {
+            ...stepRest,
+            requiredChemicalsForStep: [],
+            microSteps: (microSteps || []).map((microStep) => ({
+              ...microStep,
+              expectedChemicalsForStep: [],
+            })),
+          };
+        }),
+      };
+    });
+
+    const experiments = await Experiment.insertMany(
+      [
+        ...genericExperimentsToInsert,
+        ...chemistryPracticalsToInsert,
+        ...physicsPracticalsToInsert,
+      ].map(withCurriculumRefs)
+    );
+    console.log(
+      `✅ Seeded ${experiments.length} experiments (${chemistryPracticalsToInsert.length} Chemistry practicals, ${physicsPracticalsToInsert.length} Physics practicals)`
+    );
+
+    // Seed Biology Concept Visualizations — a separate collection from Experiment (no bench/
+    // equipment/chemical grading involved), so no symbol/ObjectId resolution is needed here.
+    const biologyVisualizations = await BiologyVisualization.insertMany(biologyVisualizationsData);
+    console.log(`✅ Seeded ${biologyVisualizations.length} Biology concept visualizations`);
 
     console.log("\n🎉 Database seeded successfully!");
     console.log(`   Misconceptions: ${misconceptions.length}`);
@@ -145,6 +227,7 @@ const seed = async () => {
     console.log(`   Chemicals: ${chemicals.length}`);
     console.log(`   Reactions: ${reactions.length}`);
     console.log(`   Experiments: ${experiments.length}`);
+    console.log(`   Biology visualizations: ${biologyVisualizations.length}`);
 
     await mongoose.disconnect();
     process.exit(0);

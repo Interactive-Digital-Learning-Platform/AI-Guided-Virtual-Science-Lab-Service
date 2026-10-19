@@ -1,0 +1,832 @@
+{
+  "Acid-Base Neutralization": {
+    "generatedAt": "2026-08-29T22:29:21.444Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Acids, Bases and Salts",
+        "sectionTitle": "7.4 Neutralisation",
+        "pageStart": 208,
+        "pageEnd": 209,
+        "confidence": 0.96,
+        "snippet": "You have studied the fact that when acids react with bases, salts and water are produced. HCl (aq) + NaOH (aq) → NaCl (aq) + H2O (l). H+ ions combine with OH- ions to form water.",
+        "sourceChunkIds": [
+          "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+          "4153615a-7970-5840-a6a2-f838593801af",
+          "d72cf708-a72e-599c-9fee-6c161abf5168",
+          "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+          "c878e830-f191-5582-9fd9-0c9b5ed29754"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Mixtures",
+          "sectionTitle": "Preparing a solution of a specific concentration",
+          "pageStart": 59,
+          "pageEnd": 60,
+          "confidence": 0.78,
+          "snippet": "When preparing a solution of a specific concentration, factors include cleanliness of equipment, weighing the solute accurately, proper transfer, correct mixing technique, adjusting final volume, and ",
+          "sourceChunkIds": [
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "db14365e-042d-5258-b4a3-cbeee6f3a9f9",
+            "e556c4d7-56c3-57ad-8ce8-cd0ddea2f579"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Heat Changes Associated with Chemical Reactions",
+          "sectionTitle": "Setting up the Neutralisation Reaction",
+          "pageStart": 215,
+          "pageEnd": 217,
+          "confidence": 0.95,
+          "snippet": "To two beakers, measure 50 cm³ of NaOH solution and 50 cm³ of HCl solution separately, record their temperatures, then mix them in a polystyrene cup, stir and record the maximum temperature.",
+          "sourceChunkIds": [
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "e29d851b-12c8-51fa-90fa-e08eb6e305c1",
+            "fc0c4200-6ea2-5303-9cda-b7b3aa3a0fa0"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Indicators for detecting acid‑base reactions",
+          "pageStart": 205,
+          "pageEnd": 207,
+          "confidence": 0.95,
+          "snippet": "Materials required : Blue litmus, red litmus, methyl orange, phenolphthalein, ... Add the given indicators to the solutions ... record the observations.",
+          "sourceChunkIds": [
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "888bd746-854e-58bc-bdae-f3670fa1dacf",
+            "d7326058-3ee7-5031-b29d-7d1cdf8010ff"
+          ]
+        }
+      ],
+      "4": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "7.4 Neutralisation",
+          "pageStart": 208,
+          "pageEnd": 209,
+          "confidence": 0.97,
+          "snippet": "You have studied the fact that when acids react with bases, salts and water are produced... H+ (aq) + OH- (aq) → H2O (l)",
+          "sourceChunkIds": [
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "4153615a-7970-5840-a6a2-f838593801af",
+            "68fe5665-0f3b-50e6-8da9-acbca37b6709",
+            "e556c4d7-56c3-57ad-8ce8-cd0ddea2f579",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754"
+          ]
+        }
+      ],
+      "5": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Indicators for identifying acids and bases",
+          "pageStart": 205,
+          "pageEnd": 207,
+          "confidence": 0.92,
+          "snippet": "Materials required : Blue litmus, red litmus, methyl orange, phenolphthalein, lime juice, dilute hydrochloric acid, dilute sulphuric acid, vinegar, dilute sodium hydroxide solution, soap solution",
+          "sourceChunkIds": [
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "d7326058-3ee7-5031-b29d-7d1cdf8010ff",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "68fe5665-0f3b-50e6-8da9-acbca37b6709"
+          ]
+        }
+      ]
+    }
+  },
+  "Acid-Base Titration": {
+    "generatedAt": "2026-08-29T22:29:55.025Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Acids, Bases and Salts",
+        "sectionTitle": "Indicators and identification of acids and bases",
+        "pageStart": 205,
+        "pageEnd": 207,
+        "confidence": 0.78,
+        "snippet": "Materials required: Blue litmus, red litmus, methyl orange, phenolphthalein, lime juice, dilute HCl, dilute H2SO4, vinegar, dilute NaOH, soap solution. Add indicators to solutions and record observati",
+        "sourceChunkIds": [
+          "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+          "4153615a-7970-5840-a6a2-f838593801af",
+          "c878e830-f191-5582-9fd9-0c9b5ed29754",
+          "d7326058-3ee7-5031-b29d-7d1cdf8010ff",
+          "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4"
+        ]
+      }
+    ],
+    "steps": {
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Heat Changes Associated with Chemical Reactions",
+          "sectionTitle": "Measuring solutions for titration",
+          "pageStart": 215,
+          "pageEnd": 217,
+          "confidence": 0.95,
+          "snippet": "To two beakers, measure 50 cm³ of the sodium hydroxide solution and 50 cm³ of the hydrochloric acid solution separately using the measuring cylinder.",
+          "sourceChunkIds": [
+            "e29d851b-12c8-51fa-90fa-e08eb6e305c1",
+            "474e65ef-9e44-500b-a431-693b71b0cbab",
+            "c8d7ff96-a590-5e9f-8d97-ebf44734af36",
+            "cc4677d3-4ffa-5345-95ea-87207b8792c5",
+            "d6a6aa35-f28d-55ba-8a26-be387aca304d"
+          ]
+        }
+      ]
+    }
+  },
+  "Identification of Gases": {
+    "generatedAt": "2026-08-29T22:32:25.102Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 10 Science Textbook",
+        "bookFilename": "grade-10-science-text-book-part-2.pdf",
+        "grade": 10,
+        "lessonTitle": "Collecting carbon dioxide gas by upward displacement of air",
+        "sectionTitle": "Activity 16.10",
+        "pageStart": 118,
+        "pageEnd": 119,
+        "confidence": 0.95,
+        "snippet": "Fig. 16.6 - Collecting carbon dioxide gas by upward displacement of air. Under guidance, set the apparatus (Fig. 16.5) and fill test tubes with carbon dioxide gas.",
+        "sourceChunkIds": [
+          "22417961-e8e2-5b77-818d-151163f42c35",
+          "c0a54c9a-46be-5a48-aa3d-2a8d827c48e4",
+          "dcf32f3f-5adf-5f51-8e95-3afcb895a32d",
+          "888bd746-854e-58bc-bdae-f3670fa1dacf",
+          "c5b394a3-70f5-5c40-8bc8-e2ed018651ac"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Chemical Changes",
+          "sectionTitle": "Activity 16.2",
+          "pageStart": 98,
+          "pageEnd": 100,
+          "confidence": 0.78,
+          "snippet": "Requirements:- magnesium ribbon, zinc granul",
+          "sourceChunkIds": [
+            "ef8ea920-bb0f-509b-9386-74efae4580a3",
+            "cc4677d3-4ffa-5345-95ea-87207b8792c5",
+            "fc0c4200-6ea2-5303-9cda-b7b3aa3a0fa0",
+            "86428b4d-869f-5ed5-bc76-0a74b76d0138",
+            "2a55a231-0633-5e47-842f-f33d6851fac9"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Catalysts",
+          "sectionTitle": "Activity - 17.4",
+          "pageStart": 131,
+          "pageEnd": 131,
+          "confidence": 0.93,
+          "snippet": "Observe the speed of evolution of gas bubbles from the test tubes. 2H2O2(aq) → 2H2O(l) + O2(g)",
+          "sourceChunkIds": [
+            "ef8ea920-bb0f-509b-9386-74efae4580a3",
+            "77be84fa-461a-5718-8baa-95ccdbee374c",
+            "f1d8c644-ee12-561c-8777-8a6118b93b3d",
+            "2a55a231-0633-5e47-842f-f33d6851fac9",
+            "d7667e40-3724-58d4-83dd-aa4e9eb2b801"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Hydrocarbons and Their Derivatives",
+          "sectionTitle": "Activity 14.1 – Confirming the pressure of carbon and hydrogen in candle wax",
+          "pageStart": 202,
+          "pageEnd": 202,
+          "confidence": 0.45,
+          "snippet": "...the anhydrous copper sulphate ... turns from white to blue. This change ... was brought about by the water produced during the burning of the candle. Hydrogen required to produce that water was sup",
+          "sourceChunkIds": [
+            "77be84fa-461a-5718-8baa-95ccdbee374c",
+            "c5b394a3-70f5-5c40-8bc8-e2ed018651ac",
+            "6814a135-4897-5c0a-8ade-5f3b1d1c11a3",
+            "474e65ef-9e44-500b-a431-693b71b0cbab",
+            "79b9798d-92f9-58bc-9f58-4f3554c9bb00"
+          ]
+        }
+      ]
+    }
+  },
+  "Metal Displacement Reactions": {
+    "generatedAt": "2026-08-29T22:34:12.747Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 10 Science Textbook",
+        "bookFilename": "grade-10-science-text-book-part-2.pdf",
+        "grade": 10,
+        "lessonTitle": "Changes in Matter",
+        "sectionTitle": "Single Displacement Reactions",
+        "pageStart": 100,
+        "pageEnd": 102,
+        "confidence": 0.85,
+        "snippet": "Focus your attention on the third reaction of Activity 16.2. In that reaction zinc metal reacts with copper sulphate freeing copper metal and forming zinc sulphate. The reactions in which an element d",
+        "sourceChunkIds": [
+          "7e954886-2cf1-5df6-88c6-28fb38471eb6",
+          "2487c983-271e-5dc4-a0b9-030e8edd9b8b",
+          "62faa75d-937a-59bf-a51d-52db1e325370",
+          "254c70a6-69a6-508d-9a72-482a4fa03dd5",
+          "494fb035-0411-511f-9ae3-42a7fd526cdc"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Activity Series",
+          "sectionTitle": "16.4 Activity Series",
+          "pageStart": 109,
+          "pageEnd": 110,
+          "confidence": 0.78,
+          "snippet": "The activity series is built up on the basis of those observations as well as other data. The series obtained by the arrangement of metals in the descending order of their reactivity is referred to as",
+          "sourceChunkIds": [
+            "4d9a94f9-7c2d-565c-ad48-4cf5c700719a",
+            "c8d7ff96-a590-5e9f-8d97-ebf44734af36",
+            "f74624d9-d798-552b-9161-6b0b744b7921",
+            "3a735683-de72-57b0-b696-265451427ff7",
+            "8b9d9978-136e-5899-85eb-d9e6eb8cff9d"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Reactions of Metals with Solutions of Other Metallic Salts",
+          "sectionTitle": "Activity 16.7 – Metal displacement with copper sulphate",
+          "pageStart": 108,
+          "pageEnd": 109,
+          "confidence": 0.93,
+          "snippet": "An aqueous solution of copper sulphate can be prepared by dissolving this salt in water. Let us use the reaction of the metal zinc (Zn) with the copper sulphate solution...",
+          "sourceChunkIds": [
+            "4d9a94f9-7c2d-565c-ad48-4cf5c700719a",
+            "7e954886-2cf1-5df6-88c6-28fb38471eb6",
+            "2487c983-271e-5dc4-a0b9-030e8edd9b8b",
+            "c8d7ff96-a590-5e9f-8d97-ebf44734af36",
+            "254c70a6-69a6-508d-9a72-482a4fa03dd5"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Reactions of Metals with Solutions of Other Metallic Salts",
+          "sectionTitle": "Activity 16.7 – Metal displacement with copper sulphate",
+          "pageStart": 108,
+          "pageEnd": 109,
+          "confidence": 0.95,
+          "snippet": "Add copper sulphate solution to the beaker. Add a zinc granule to it. Record the observation as the metal reacts with the solution, displacing copper.",
+          "sourceChunkIds": [
+            "4d9a94f9-7c2d-565c-ad48-4cf5c700719a",
+            "7e954886-2cf1-5df6-88c6-28fb38471eb6",
+            "2487c983-271e-5dc4-a0b9-030e8edd9b8b",
+            "c8d7ff96-a590-5e9f-8d97-ebf44734af36",
+            "62faa75d-937a-59bf-a51d-52db1e325370"
+          ]
+        }
+      ],
+      "4": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Reactions of Metals with Solutions of Other Metallic Salts",
+          "sectionTitle": "Activity 16.7",
+          "pageStart": 108,
+          "pageEnd": 109,
+          "confidence": 0.93,
+          "snippet": "Add a zinc granule to copper sulphate solution, observe the reaction where zinc displaces copper, forming zinc sulphate and copper metal.",
+          "sourceChunkIds": [
+            "4d9a94f9-7c2d-565c-ad48-4cf5c700719a",
+            "c8d7ff96-a590-5e9f-8d97-ebf44734af36",
+            "7e954886-2cf1-5df6-88c6-28fb38471eb6",
+            "3a735683-de72-57b0-b696-265451427ff7",
+            "ecd694b2-2dd3-507a-8938-5155a5bfbc21"
+          ]
+        }
+      ]
+    }
+  },
+  "Testing Acids and Bases": {
+    "generatedAt": "2026-08-29T22:38:30.546Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 11 Science Textbook",
+        "bookFilename": "grade-11-science-text-book.pdf",
+        "grade": 11,
+        "lessonTitle": "Acids, Bases and Salts",
+        "sectionTitle": "Testing Acids and Bases (practical)",
+        "pageStart": 205,
+        "pageEnd": 207,
+        "confidence": 0.97,
+        "snippet": "Materials required: blue litmus, red litmus, methyl orange, phenolphthalein, lime juice, dilute HCl, dilute H2SO4, vinegar, dilute NaOH, soap solution. Add indicators to solutions and record observati",
+        "sourceChunkIds": [
+          "d7326058-3ee7-5031-b29d-7d1cdf8010ff",
+          "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+          "d72cf708-a72e-599c-9fee-6c161abf5168",
+          "c878e830-f191-5582-9fd9-0c9b5ed29754",
+          "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Testing Acids and Bases",
+          "pageStart": 205,
+          "pageEnd": 207,
+          "confidence": 0.95,
+          "snippet": "Materials required: blue litmus, red litmus, methyl orange, phenolphthalein, lime juice, dilute HCl, dilute H2SO4, vinegar, dilute NaOH, soap solution. Add indicators to solutions and record observati",
+          "sourceChunkIds": [
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "d7326058-3ee7-5031-b29d-7d1cdf8010ff",
+            "d72cf708-a72e-599c-9fee-6c161abf5168"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Acids and Bases",
+          "pageStart": 209,
+          "pageEnd": 210,
+          "confidence": 0.92,
+          "snippet": "The substances that release H+ ions in aqueous solution are called acids. The substances that increase the OH- ion concentration in aqueous solution are known as bases. Both acids and bases change the",
+          "sourceChunkIds": [
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "68fe5665-0f3b-50e6-8da9-acbca37b6709",
+            "dcf32f3f-5adf-5f51-8e95-3afcb895a32d"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Acids and Bases",
+          "pageStart": 209,
+          "pageEnd": 210,
+          "confidence": 0.78,
+          "snippet": "The substances that release H+ ions in aqueous solution are called acids... Both acids and bases change the colour of indicators.",
+          "sourceChunkIds": [
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "68fe5665-0f3b-50e6-8da9-acbca37b6709",
+            "d72cf708-a72e-599c-9fee-6c161abf5168"
+          ]
+        }
+      ],
+      "4": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Acids, Bases and Salts",
+          "sectionTitle": "Acids and Bases",
+          "pageStart": 209,
+          "pageEnd": 210,
+          "confidence": 0.85,
+          "snippet": "The substances that release H+ ions in aqueous solution are called acids... Both acids and bases change the colour of indicators.",
+          "sourceChunkIds": [
+            "c878e830-f191-5582-9fd9-0c9b5ed29754",
+            "eaab7cdb-b1b3-5d28-91b4-23b9dfed5ff4",
+            "fc384a66-1f8d-5b5c-8a2b-38a862431a30",
+            "e556c4d7-56c3-57ad-8ce8-cd0ddea2f579",
+            "f9a7e942-3f7c-5f25-ae9a-b102a1d8c055"
+          ]
+        }
+      ]
+    }
+  },
+  "Hooke's Law — Spring Constant": {
+    "generatedAt": "2026-08-29T22:31:36.932Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 10 Science Textbook",
+        "bookFilename": "grade-10-science-text-book-part-1.pdf",
+        "grade": 10,
+        "lessonTitle": "Gravitational Force (weight)",
+        "sectionTitle": "Gravitational Force (weight)",
+        "pageStart": 216,
+        "pageEnd": 216,
+        "confidence": 0.7,
+        "snippet": "Here there are two forces acting on the object. One force is the weight of the object which arises due to the gravitational force. The other is the upward force exerted by the spring of the balance in",
+        "sourceChunkIds": [
+          "cfca9f3f-1a48-5ccf-a73f-9fc90751d519",
+          "486036c8-7ad0-5ee6-9f40-408ba40fa45b",
+          "9812a4de-dbc7-5b9f-bf2d-c0703509f58b",
+          "a95c6b1e-d2f6-5bff-8359-67d62073387e",
+          "eab05ea8-7464-571e-9a47-df02147c06b9"
+        ]
+      }
+    ],
+    "steps": {
+      "2": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Gravitational Force",
+          "sectionTitle": "Gravitational Force (weight)",
+          "pageStart": 202,
+          "pageEnd": 202,
+          "confidence": 0.85,
+          "snippet": "Here there are two forces acting on the object. One force is the weight of the object which arises due to the gravitational force. The other is the upward force exerted by the spring of the balance...",
+          "sourceChunkIds": [
+            "486036c8-7ad0-5ee6-9f40-408ba40fa45b",
+            "d7e7afd1-6d16-5ecc-9e5a-043ea2a91af0",
+            "9812a4de-dbc7-5b9f-bf2d-c0703509f58b",
+            "cfca9f3f-1a48-5ccf-a73f-9fc90751d519",
+            "caeca720-127f-5d8d-8e7d-1063271e949e"
+          ]
+        }
+      ]
+    }
+  },
+  "Measuring Density by Displacement": {
+    "generatedAt": "2026-08-29T22:33:15.957Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 10 Science Textbook",
+        "bookFilename": "grade-10-science-text-book-part-2.pdf",
+        "grade": 10,
+        "lessonTitle": "Hydrometer and Archimedes' Principle",
+        "sectionTitle": "Measuring Density by Displacement",
+        "pageStart": 94,
+        "pageEnd": 95,
+        "confidence": 0.92,
+        "snippet": "Hydrometer has been made in accordance with Archimedes' principle... the hydrometer immerses in the liquid to a height so as to displace a weight equal to the weight of the hydrometer.",
+        "sourceChunkIds": [
+          "bf058274-977b-5eba-af43-7a8f9d681120",
+          "761ecd41-a639-5e8c-a717-f5967b9fe9e0",
+          "f78fa42b-2bb7-5608-a79c-3601568ce7d7",
+          "09af3175-81ca-5c59-90b8-07aa624b3c40",
+          "d7bc6191-0c76-5781-be9c-9c2f0bd4506a"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-1.pdf",
+          "grade": 10,
+          "lessonTitle": "Mass and weight",
+          "sectionTitle": "4.3 Mass and weight",
+          "pageStart": 109,
+          "pageEnd": 111,
+          "confidence": 0.95,
+          "snippet": "The mass of an object is the amount of matter in it. The international unit of mass is the kg.",
+          "sourceChunkIds": [
+            "d7e7afd1-6d16-5ecc-9e5a-043ea2a91af0",
+            "26922e80-ff2c-5471-8fed-45896d81f2dc",
+            "f78fa42b-2bb7-5608-a79c-3601568ce7d7",
+            "d6877784-f77a-5bda-9d58-3d7561574fd1",
+            "8ed2b7ef-3c1f-5496-9ec6-fdd461225478"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Upthrust",
+          "sectionTitle": "Measuring Volume by Displacement",
+          "pageStart": 89,
+          "pageEnd": 90,
+          "confidence": 0.92,
+          "snippet": "Now submerge the metal cube in water ... record the spring balance readings and the weight of the beaker together with the displaced water each time.",
+          "sourceChunkIds": [
+            "d7bc6191-0c76-5781-be9c-9c2f0bd4506a",
+            "bf058274-977b-5eba-af43-7a8f9d681120",
+            "761ecd41-a639-5e8c-a717-f5967b9fe9e0",
+            "09af3175-81ca-5c59-90b8-07aa624b3c40",
+            "7e2aab83-af09-508f-94b7-c0423142bab3"
+          ]
+        }
+      ]
+    }
+  },
+  "Ohm's Law Verification": {
+    "generatedAt": "2026-08-29T22:35:22.859Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 10 Science Textbook",
+        "bookFilename": "grade-10-science-text-book-part-2.pdf",
+        "grade": 10,
+        "lessonTitle": "Relationship between the current flowing through a conductor and the potential difference across the conductor",
+        "sectionTitle": "19.4 Relationship between the current flowing through a conductor and the potential difference across the conductor",
+        "pageStart": 159,
+        "pageEnd": 161,
+        "confidence": 0.96,
+        "snippet": "Items required: a nichrome wire coil, a voltmeter, an ammeter, a rheostat, two dry cells, connecting wires, a switch",
+        "sourceChunkIds": [
+          "5c427c95-2558-52c8-b8ed-da92f431b38b",
+          "dd42636b-7034-554e-9fe0-dfac2a397e58",
+          "2ac9ae7e-d6ca-5b31-aa36-61e281ff4874",
+          "7872c212-57df-540b-b19f-4171447242c9",
+          "4f39b471-d554-568c-abd1-00adbb5eeb49"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Activity 19.2",
+          "sectionTitle": "Build the circuit for Ohm's Law verification",
+          "pageStart": 158,
+          "pageEnd": 159,
+          "confidence": 0.96,
+          "snippet": "Items required: two dry cells, conducting wires, a voltmeter, an ammeter, a bulb… Connect the circuits as shown in Figure 19.14(a) and observe the lighting of the bulb.",
+          "sourceChunkIds": [
+            "4f39b471-d554-568c-abd1-00adbb5eeb49",
+            "dd42636b-7034-554e-9fe0-dfac2a397e58",
+            "2ac9ae7e-d6ca-5b31-aa36-61e281ff4874",
+            "eed95f46-2019-586c-9aa6-d673476ee058",
+            "96ec6052-fb94-5c92-9cb5-b2d88cdf9adb"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Resistor Colour Codes and Tolerance",
+          "sectionTitle": "Colour Coding of Resistors",
+          "pageStart": 169,
+          "pageEnd": 170,
+          "confidence": 0.93,
+          "snippet": "Value of resistor brown black red = 1000 Ω; Tolerance value = 10 % → range 900 Ω–1100 Ω. Color table shows bands and tolerance percentages.",
+          "sourceChunkIds": [
+            "3882cdcc-beca-5d75-bd06-e5e84e89249b",
+            "5c427c95-2558-52c8-b8ed-da92f431b38b",
+            "7872c212-57df-540b-b19f-4171447242c9",
+            "4bf4104d-617d-56d9-a049-5faaefba20e0",
+            "c7ed0bb8-e4b1-5aeb-ad7f-3ebc167bc4ea"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Relationship between the current flowing through a conductor and the potential difference across the conductor",
+          "sectionTitle": "Activity 19.3",
+          "pageStart": 159,
+          "pageEnd": 161,
+          "confidence": 0.95,
+          "snippet": "Items required: a nichrome wire coil, a voltmeter, an ammeter, a rheostat, two dry cells, connecting wires, a switch. The voltmeter is used to measure the voltage affecting the conductor; the ammeter ",
+          "sourceChunkIds": [
+            "5c427c95-2558-52c8-b8ed-da92f431b38b",
+            "dd42636b-7034-554e-9fe0-dfac2a397e58",
+            "1320970e-34e2-53b2-ad2a-664246ff1d28",
+            "2ac9ae7e-d6ca-5b31-aa36-61e281ff4874",
+            "ca7cbd9e-ac1a-56b9-9f63-a0b01bb82359"
+          ]
+        }
+      ],
+      "4": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Electrical Resistance and Ohm's Law",
+          "sectionTitle": "Resistance and Ohm’s Law",
+          "pageStart": 161,
+          "pageEnd": 162,
+          "confidence": 0.96,
+          "snippet": "Ohm’s law can be expressed in the form of an equation as V=IR, where V is the potential difference, I is the current and R is the resistance.",
+          "sourceChunkIds": [
+            "5c427c95-2558-52c8-b8ed-da92f431b38b",
+            "dd42636b-7034-554e-9fe0-dfac2a397e58",
+            "2ac9ae7e-d6ca-5b31-aa36-61e281ff4874",
+            "7872c212-57df-540b-b19f-4171447242c9",
+            "4bf4104d-617d-56d9-a049-5faaefba20e0"
+          ]
+        }
+      ]
+    }
+  },
+  "Series and Parallel Resistor Combinations": {
+    "generatedAt": "2026-08-29T22:36:32.194Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 10 Science Textbook",
+        "bookFilename": "grade-10-science-text-book-part-2.pdf",
+        "grade": 10,
+        "lessonTitle": "Combination of resistors",
+        "sectionTitle": "19.7 Combination of resistors",
+        "pageStart": 171,
+        "pageEnd": 173,
+        "confidence": 0.93,
+        "snippet": "Resistors are used to control the current... There are two basic methods of combining resistors. 1. Series combination of resistors 2. Parallel combination of resistors. Series: same current flows thr",
+        "sourceChunkIds": [
+          "7872c212-57df-540b-b19f-4171447242c9",
+          "4e8cfb8a-9b99-5ae7-b9d3-caa5ce9f99b0",
+          "c7ed0bb8-e4b1-5aeb-ad7f-3ebc167bc4ea",
+          "b9211a83-7fd4-5f51-8905-82715c205f9c",
+          "dd42636b-7034-554e-9fe0-dfac2a397e58"
+        ]
+      }
+    ],
+    "steps": {
+      "1": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "19.7 Combination of resistors",
+          "sectionTitle": "Series combination of resistors",
+          "pageStart": 171,
+          "pageEnd": 173,
+          "confidence": 0.96,
+          "snippet": "When the resistors are connected in such a way that the same current flows through each of the resistors as shown in Figure 19.29, it is known as a series combination of resistors.",
+          "sourceChunkIds": [
+            "7872c212-57df-540b-b19f-4171447242c9",
+            "4e8cfb8a-9b99-5ae7-b9d3-caa5ce9f99b0",
+            "4f39b471-d554-568c-abd1-00adbb5eeb49",
+            "dcb610f8-eff5-5783-8540-bd0fb1c0a649",
+            "eed95f46-2019-586c-9aa6-d673476ee058"
+          ]
+        }
+      ],
+      "2": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Combination of Resistors",
+          "sectionTitle": "Series combination of resistors",
+          "pageStart": 171,
+          "pageEnd": 173,
+          "confidence": 0.85,
+          "snippet": "When the resistors are connected in such a way that the same current flows through each of the resistors ... it is known as a series combination of resistors.",
+          "sourceChunkIds": [
+            "7872c212-57df-540b-b19f-4171447242c9",
+            "2ac9ae7e-d6ca-5b31-aa36-61e281ff4874",
+            "4e8cfb8a-9b99-5ae7-b9d3-caa5ce9f99b0",
+            "c7ed0bb8-e4b1-5aeb-ad7f-3ebc167bc4ea",
+            "5c427c95-2558-52c8-b8ed-da92f431b38b"
+          ]
+        }
+      ],
+      "3": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Combination of Resistors",
+          "sectionTitle": "Parallel Combination of Resistors",
+          "pageStart": 173,
+          "pageEnd": 175,
+          "confidence": 0.96,
+          "snippet": "In a parallel circuit the total current is the sum of the currents through each resistor, and 1/Req = 1/R1 + 1/R2 + 1/R3.",
+          "sourceChunkIds": [
+            "7872c212-57df-540b-b19f-4171447242c9",
+            "4e8cfb8a-9b99-5ae7-b9d3-caa5ce9f99b0",
+            "50327c74-b449-5d33-a698-d17886dee9a0",
+            "eed95f46-2019-586c-9aa6-d673476ee058",
+            "302f3bf4-b2ee-50ab-8e0d-4b174e42ff24"
+          ]
+        }
+      ],
+      "4": [
+        {
+          "bookTitle": "Grade 10 Science Textbook",
+          "bookFilename": "grade-10-science-text-book-part-2.pdf",
+          "grade": 10,
+          "lessonTitle": "Combination of Resistors",
+          "sectionTitle": "Parallel combination of resistors",
+          "pageStart": 173,
+          "pageEnd": 175,
+          "confidence": 0.93,
+          "snippet": "In this circuit, the total current is divided among each of the resistors... The equivalent resistance of a parallel combination of resistors can be expressed by 1/R = 1/R1 + 1/R2 + 1/R3.",
+          "sourceChunkIds": [
+            "7872c212-57df-540b-b19f-4171447242c9",
+            "2ac9ae7e-d6ca-5b31-aa36-61e281ff4874",
+            "4e8cfb8a-9b99-5ae7-b9d3-caa5ce9f99b0",
+            "5c427c95-2558-52c8-b8ed-da92f431b38b",
+            "c7ed0bb8-e4b1-5aeb-ad7f-3ebc167bc4ea"
+          ]
+        }
+      ]
+    }
+  },
+  "Simple Pendulum — Measuring g": {
+    "generatedAt": "2026-08-29T22:37:38.302Z",
+    "experimentRefs": [
+      {
+        "bookTitle": "Grade 10 Science Textbook",
+        "bookFilename": "grade-10-science-text-book-part-1.pdf",
+        "grade": 10,
+        "lessonTitle": "Gravitational acceleration",
+        "sectionTitle": "2.7 Gravitational acceleration",
+        "pageStart": 58,
+        "pageEnd": 60,
+        "confidence": 0.92,
+        "snippet": "The acceleration caused by the earth’s gravitational attraction is known as the gravitational acceleration. Its symbol is g. The average value for the gravitational acceleration at sea level is about ",
+        "sourceChunkIds": [
+          "531bbdb4-af17-504b-b124-2df2c68a7371",
+          "cfca9f3f-1a48-5ccf-a73f-9fc90751d519",
+          "ac4995f9-0190-5fe3-a0c1-2c9959051bc4",
+          "933e0d3a-60cb-5b09-9462-81d8ece8eb68",
+          "841dded1-5ec9-5263-b926-1c8c8f39c3b5"
+        ]
+      }
+    ],
+    "steps": {
+      "2": [
+        {
+          "bookTitle": "Grade 11 Science Textbook",
+          "bookFilename": "grade-11-science-text-book.pdf",
+          "grade": 11,
+          "lessonTitle": "Oscillations",
+          "sectionTitle": "Period of an Oscillation",
+          "pageStart": 90,
+          "pageEnd": 90,
+          "confidence": 0.55,
+          "snippet": "The time taken by a particle for a complete oscillation is known as the period (T).",
+          "sourceChunkIds": [
+            "531bbdb4-af17-504b-b124-2df2c68a7371",
+            "48328f38-fe5a-589b-b1d7-a57275641973",
+            "5b824c50-64be-5c56-8bc2-402c5672e5a2",
+            "f178681d-6760-517e-96d7-ca1ff3ecc3cc",
+            "ac4995f9-0190-5fe3-a0c1-2c9959051bc4"
+          ]
+        }
+      ]
+    }
+  }
+}
