@@ -1,65 +1,38 @@
+// Legacy generic experiments (Biology and two early Chemistry practicals) predating the guided
+// equipment/chemical-selection flow — none of these steps carry requiredEquipment/
+// requiredChemicalsForStep, so there isn't enough structure here to safely derive Current Task
+// (microStep) decompositions without guessing at a procedure that isn't actually encoded in this
+// data. They intentionally have no `microSteps` and run on the micro-step engine's whole-step
+// fallback path (see resolveGradingTarget in session.controller.js) — functionally identical to
+// how they behaved before this feature existed. They're also already excluded from the guided
+// catalog (see getExperimentsBySubject's "requiredEquipment.0": {$exists:true} filter). Migrating
+// these to real Current Tasks would require authoring the missing requiredEquipment/
+// requiredChemicalsForStep data first — out of scope here, flagged rather than guessed.
+//
+// The two legacy generic Physics entries that used to live here ("Measuring Density", "Ohm's Law
+// Verification") were removed once physicsPracticals.js added proper guided replacements covering
+// the same subject matter (see seed.js) — keeping both would leave two differently-shaped
+// experiments with the same real-world topic in the database.
 const experiments = [
-  {
-    title: "Measuring Density",
-    subject: "Physics",
-    grades: [7, 8],
-    difficulty: "easy",
-    estimatedTime: 20,
-    description: "Measure the density of a solid object using mass and water displacement.",
-    objectives: ["Measure mass using a balance", "Measure volume by water displacement", "Calculate density"],
-    materials: ["Balance", "Graduated cylinder", "Water", "Solid object", "String"],
-    thumbnailColor: "#4F8EF7",
-    commonMisconceptions: ["PHY_001", "PHY_002"],
-    steps: [
-      { stepId: 1, title: "Zero the Balance", instruction: "Place the balance on a flat surface and zero it.", expectedAction: "zero_balance", actionType: "setup", timeLimit: 60, misconceptionRisks: [], hints: [{ level: 1, text: "Make sure the balance pan is empty first." }, { level: 2, text: "Press the tare/zero button to reset the balance to 0." }, { level: 3, text: "The balance reading should show 0.00g before you place anything on it." }] },
-      { stepId: 2, title: "Measure Mass", instruction: "Place the object on the balance and record its mass in grams.", expectedAction: "record_mass", actionType: "measure", timeLimit: 60, misconceptionRisks: ["PHY_001"], hints: [{ level: 1, text: "Place the object carefully on the balance pan." }, { level: 2, text: "Wait for the reading to stabilize, then record it." }, { level: 3, text: "Write down the mass value in grams (e.g., 45.6 g)." }] },
-      { stepId: 3, title: "Fill Cylinder", instruction: "Fill the graduated cylinder with water to the 50 ml mark.", expectedAction: "fill_cylinder", actionType: "add", timeLimit: 90, misconceptionRisks: [], hints: [{ level: 1, text: "Use a beaker to pour water slowly." }, { level: 2, text: "Read the water level at the bottom of the meniscus." }, { level: 3, text: "The water should be exactly at the 50 ml line." }] },
-      { stepId: 4, title: "Record Initial Level", instruction: "Record the initial water level (50 ml).", expectedAction: "record_initial_volume", actionType: "record", timeLimit: 30, misconceptionRisks: [], hints: [{ level: 1, text: "This is your starting volume before adding the object." }, { level: 2, text: "Write down 50 ml as your initial volume." }, { level: 3, text: "You need this value to calculate volume by displacement." }] },
-      { stepId: 5, title: "Submerge Object", instruction: "Carefully lower the object into the cylinder using a string.", expectedAction: "submerge_object", actionType: "add", timeLimit: 60, misconceptionRisks: ["PHY_002"], hints: [{ level: 1, text: "Use the string to lower the object gently." }, { level: 2, text: "Make sure the object is fully underwater." }, { level: 3, text: "Do not splash — you need an accurate new reading." }] },
-      { stepId: 6, title: "Record Final Level", instruction: "Record the new water level after submerging the object.", expectedAction: "record_final_volume", actionType: "record", timeLimit: 30, misconceptionRisks: [], hints: [{ level: 1, text: "Read the new water level at the bottom of the meniscus." }, { level: 2, text: "This should be higher than 50 ml." }, { level: 3, text: "The difference (final - 50) equals the object's volume." }] },
-      { stepId: 7, title: "Calculate Density", instruction: "Calculate: Volume = Final - Initial. Then Density = Mass ÷ Volume.", expectedAction: "calculate_density", actionType: "calculate", timeLimit: 120, misconceptionRisks: ["PHY_001"], hints: [{ level: 1, text: "Volume of object = final water level - initial water level." }, { level: 2, text: "Density = Mass (g) ÷ Volume (ml). Units are g/ml." }, { level: 3, text: "Example: if mass=45g and volume=15ml, density = 45÷15 = 3 g/ml." }] },
-    ],
-  },
-  {
-    title: "Ohm's Law Verification",
-    subject: "Physics",
-    grades: [9, 10],
-    difficulty: "medium",
-    estimatedTime: 30,
-    description: "Verify Ohm's Law by measuring current and voltage across a resistor.",
-    objectives: ["Connect a simple circuit", "Measure voltage and current", "Calculate resistance", "Plot V-I graph"],
-    materials: ["Battery pack", "Resistor", "Ammeter", "Voltmeter", "Connecting wires", "Switch"],
-    thumbnailColor: "#F7A94F",
-    commonMisconceptions: ["PHY_003", "PHY_004"],
-    steps: [
-      { stepId: 1, title: "Connect Series Circuit", instruction: "Connect battery, switch, ammeter, and resistor in series.", expectedAction: "connect_series", actionType: "setup", timeLimit: 120, misconceptionRisks: ["PHY_003"], hints: [{ level: 1, text: "Series means all components are in one loop." }, { level: 2, text: "Connect: Battery(+) → Switch → Ammeter → Resistor → Battery(-)." }, { level: 3, text: "Ammeter must be in series so the current flows through it." }] },
-      { stepId: 2, title: "Connect Voltmeter", instruction: "Connect the voltmeter in parallel across the resistor.", expectedAction: "connect_voltmeter", actionType: "setup", timeLimit: 90, misconceptionRisks: ["PHY_004"], hints: [{ level: 1, text: "Voltmeter goes across (parallel to) the component being measured." }, { level: 2, text: "Connect one voltmeter terminal to each side of the resistor." }, { level: 3, text: "Voltmeter in parallel, Ammeter in series — remember this rule!" }] },
-      { stepId: 3, title: "Record Voltage", instruction: "Close the switch and record the voltmeter reading (V).", expectedAction: "record_voltage", actionType: "record", timeLimit: 60, misconceptionRisks: ["PHY_004"], hints: [{ level: 1, text: "Close the switch to complete the circuit." }, { level: 2, text: "Read the voltmeter scale carefully. Record in Volts (V)." }, { level: 3, text: "If the needle deflects wrongly, swap the voltmeter terminals." }] },
-      { stepId: 4, title: "Record Current", instruction: "Record the ammeter reading (I) in Amperes.", expectedAction: "record_current", actionType: "record", timeLimit: 60, misconceptionRisks: ["PHY_003"], hints: [{ level: 1, text: "Read the ammeter scale. Record in Amperes (A) or mA." }, { level: 2, text: "The current should be the same before and after the resistor." }, { level: 3, text: "If reading is too high, use the higher range on the ammeter." }] },
-      { stepId: 5, title: "Calculate Resistance", instruction: "Calculate R = V ÷ I. Record the resistance in Ohms.", expectedAction: "calculate_resistance", actionType: "calculate", timeLimit: 90, misconceptionRisks: ["PHY_004"], hints: [{ level: 1, text: "Ohm's Law: V = IR, so R = V ÷ I." }, { level: 2, text: "Divide your voltage reading by your current reading." }, { level: 3, text: "Units: Volts ÷ Amperes = Ohms (Ω)." }] },
-      { stepId: 6, title: "Repeat with Different Voltage", instruction: "Change battery setting, repeat steps 3-5 for 3 different voltages.", expectedAction: "repeat_measurements", actionType: "measure", timeLimit: 180, misconceptionRisks: [], hints: [{ level: 1, text: "Record at least 3 different V and I pairs." }, { level: 2, text: "Change the number of batteries or use a variable resistor." }, { level: 3, text: "You need multiple data points to plot a V-I graph." }] },
-      { stepId: 7, title: "Plot V-I Graph", instruction: "Plot Voltage (y-axis) vs Current (x-axis). Draw best-fit line.", expectedAction: "plot_graph", actionType: "record", timeLimit: 120, misconceptionRisks: [], hints: [{ level: 1, text: "Label axes: y = Voltage (V), x = Current (A)." }, { level: 2, text: "Plot each V-I pair as a point on the graph." }, { level: 3, text: "The slope of the best-fit line = resistance R." }] },
-    ],
-  },
   {
     title: "Acid-Base Titration",
     subject: "Chemistry",
     grades: [10, 11],
     difficulty: "hard",
     estimatedTime: 40,
-    description: "Determine the concentration of hydrochloric acid by titrating with sodium hydroxide.",
-    objectives: ["Set up a burette correctly", "Add indicator", "Perform titration to endpoint", "Calculate concentration"],
+    description: "Determine the concentration of an acid by titrating it against a base of known concentration.",
+    objectives: ["Set up apparatus for controlled delivery", "Add a way to detect the endpoint", "Titrate to the endpoint", "Calculate concentration"],
     materials: ["Burette", "Conical flask", "Pipette", "HCl solution", "NaOH solution", "Phenolphthalein indicator", "Retort stand"],
     thumbnailColor: "#E74C3C",
     commonMisconceptions: ["CHEM_001", "CHEM_002", "CHEM_003"],
     steps: [
-      { stepId: 1, title: "Rinse Burette", instruction: "Rinse the burette with NaOH solution, then fill to 0 ml mark.", expectedAction: "fill_burette", actionType: "setup", timeLimit: 120, misconceptionRisks: ["CHEM_001"], hints: [{ level: 1, text: "Always rinse glassware with the solution you'll fill it with." }, { level: 2, text: "Fill the burette above 0, then drain to the 0 ml mark." }, { level: 3, text: "Remove any air bubble at the burette tip before recording." }] },
-      { stepId: 2, title: "Pipette Acid", instruction: "Use a pipette to transfer exactly 25 ml of HCl into a conical flask.", expectedAction: "pipette_acid", actionType: "measure", timeLimit: 90, misconceptionRisks: ["CHEM_001"], hints: [{ level: 1, text: "Use a pipette filler — never mouth pipette acids." }, { level: 2, text: "Fill to exactly the 25 ml mark, reading at eye level." }, { level: 3, text: "Touch the tip of the pipette to the flask wall to release the last drop." }] },
-      { stepId: 3, title: "Add Indicator", instruction: "Add 2-3 drops of phenolphthalein indicator to the acid in the flask.", expectedAction: "add_indicator", actionType: "add", timeLimit: 60, misconceptionRisks: ["CHEM_002"], hints: [{ level: 1, text: "Add indicator after the acid, not before." }, { level: 2, text: "Phenolphthalein is colorless in acid — this is correct!" }, { level: 3, text: "The solution should be colorless at this stage." }] },
-      { stepId: 4, title: "Record Initial Burette Reading", instruction: "Record the initial NaOH level in the burette.", expectedAction: "record_initial", actionType: "record", timeLimit: 30, misconceptionRisks: [], hints: [{ level: 1, text: "Read the burette at eye level, from the bottom of the meniscus." }, { level: 2, text: "Record to 2 decimal places (e.g., 0.00 ml)." }, { level: 3, text: "This is your starting point to calculate volume used." }] },
-      { stepId: 5, title: "Add NaOH Slowly", instruction: "Add NaOH from burette dropwise, swirling the flask constantly.", expectedAction: "titrate", actionType: "add", timeLimit: 300, misconceptionRisks: ["CHEM_001", "CHEM_003"], hints: [{ level: 1, text: "Add slowly — especially near the endpoint!" }, { level: 2, text: "Swirl the flask after each addition to mix properly." }, { level: 3, text: "Add half-drops near the end by touching the tip to the flask wall." }] },
-      { stepId: 6, title: "Detect Endpoint", instruction: "Stop when a permanent pale pink color appears. Record final burette reading.", expectedAction: "detect_endpoint", actionType: "observe", timeLimit: 60, misconceptionRisks: ["CHEM_002", "CHEM_003"], hints: [{ level: 1, text: "The endpoint is a pale pink color that persists for 30 seconds." }, { level: 2, text: "If the color fades, add one more drop of NaOH." }, { level: 3, text: "Deep pink means you've overshot — try again more carefully." }] },
-      { stepId: 7, title: "Calculate Volume Used", instruction: "Calculate volume of NaOH used = Final reading - Initial reading.", expectedAction: "calculate_volume", actionType: "calculate", timeLimit: 60, misconceptionRisks: [], hints: [{ level: 1, text: "Volume used = final burette reading - initial burette reading." }, { level: 2, text: "This is called the titre volume." }, { level: 3, text: "Repeat the titration to get consistent results (concordant titres)." }] },
+      { stepId: 1, title: "Prepare the Delivery Apparatus", instruction: "Prepare the apparatus for controlled, gradual delivery of the reacting solution, and set it to its starting reading.", expectedAction: "fill_burette", actionType: "setup", timeLimit: 120, misconceptionRisks: ["CHEM_001"], hints: [{ level: 1, text: "Always rinse glassware with the solution you'll fill it with." }, { level: 2, text: "Fill the burette above 0, then drain to the 0 ml mark." }, { level: 3, text: "Remove any air bubble at the burette tip before recording." }] },
+      { stepId: 2, title: "Measure the Acid Sample", instruction: "Accurately transfer a fixed 25 mL volume of the acid into a suitable reaction flask.", expectedAction: "pipette_acid", actionType: "measure", timeLimit: 90, misconceptionRisks: ["CHEM_001"], hints: [{ level: 1, text: "Use a pipette filler — never mouth pipette acids." }, { level: 2, text: "Fill to exactly the 25 ml mark, reading at eye level." }, { level: 3, text: "Touch the tip of the pipette to the flask wall to release the last drop." }] },
+      { stepId: 3, title: "Add a Way to Detect the Endpoint", instruction: "Add a few drops of a substance that will signal when the reaction reaches its endpoint.", expectedAction: "add_indicator", actionType: "add", timeLimit: 60, misconceptionRisks: ["CHEM_002"], hints: [{ level: 1, text: "Add indicator after the acid, not before." }, { level: 2, text: "Phenolphthalein is colorless in acid — this is correct!" }, { level: 3, text: "The solution should be colorless at this stage." }] },
+      { stepId: 4, title: "Record the Starting Reading", instruction: "Record the starting reading of your delivery apparatus before you begin adding anything.", expectedAction: "record_initial", actionType: "record", timeLimit: 30, misconceptionRisks: [], hints: [{ level: 1, text: "Read the burette at eye level, from the bottom of the meniscus." }, { level: 2, text: "Record to 2 decimal places (e.g., 0.00 ml)." }, { level: 3, text: "This is your starting point to calculate volume used." }] },
+      { stepId: 5, title: "Carry Out the Titration", instruction: "Add the base gradually while mixing constantly, slowing right down as you approach the endpoint.", expectedAction: "titrate", actionType: "add", timeLimit: 300, misconceptionRisks: ["CHEM_001", "CHEM_003"], hints: [{ level: 1, text: "Add slowly — especially near the endpoint!" }, { level: 2, text: "Swirl the flask after each addition to mix properly." }, { level: 3, text: "Add half-drops near the end by touching the tip to the flask wall." }] },
+      { stepId: 6, title: "Detect the Endpoint", instruction: "Stop as soon as the indicator shows a permanent colour change, and record the final reading.", expectedAction: "detect_endpoint", actionType: "observe", timeLimit: 60, misconceptionRisks: ["CHEM_002", "CHEM_003"], hints: [{ level: 1, text: "The endpoint is a pale pink color that persists for 30 seconds." }, { level: 2, text: "If the color fades, add one more drop of NaOH." }, { level: 3, text: "Deep pink means you've overshot — try again more carefully." }] },
+      { stepId: 7, title: "Calculate the Volume Delivered", instruction: "Calculate the volume of base delivered = final reading − starting reading.", expectedAction: "calculate_volume", actionType: "calculate", timeLimit: 60, misconceptionRisks: [], hints: [{ level: 1, text: "Volume used = final burette reading - initial burette reading." }, { level: 2, text: "This is called the titre volume." }, { level: 3, text: "Repeat the titration to get consistent results (concordant titres)." }] },
     ],
   },
   {
@@ -68,17 +41,17 @@ const experiments = [
     grades: [6, 7],
     difficulty: "easy",
     estimatedTime: 20,
-    description: "Separate an insoluble solid from a liquid using filtration.",
-    objectives: ["Set up filter funnel correctly", "Pour mixture through filter", "Collect filtrate", "Identify residue"],
+    description: "Separate an insoluble solid from a liquid by choosing and setting up a suitable separation method.",
+    objectives: ["Choose a suitable separation method", "Set up the apparatus correctly", "Pass the mixture through", "Identify what is collected and what is retained"],
     materials: ["Filter funnel", "Filter paper", "Beaker", "Retort stand", "Sand-water mixture", "Glass rod"],
     thumbnailColor: "#2ECC71",
     commonMisconceptions: ["CHEM_001"],
     steps: [
-      { stepId: 1, title: "Fold Filter Paper", instruction: "Fold the filter paper in half twice to form a cone shape.", expectedAction: "fold_filter_paper", actionType: "setup", timeLimit: 60, hints: [{ level: 1, text: "Fold the circle in half, then fold in half again." }, { level: 2, text: "Open one layer to form a cone shape." }, { level: 3, text: "The cone should fit snugly inside the funnel." }], misconceptionRisks: [] },
-      { stepId: 2, title: "Set Up Funnel", instruction: "Place the funnel in the retort stand over an empty beaker.", expectedAction: "setup_funnel", actionType: "setup", timeLimit: 60, hints: [{ level: 1, text: "The funnel tip should point into the beaker." }, { level: 2, text: "Make sure the beaker is directly below the funnel tip." }, { level: 3, text: "The funnel should be stable and not wobble." }], misconceptionRisks: [] },
-      { stepId: 3, title: "Insert Filter Paper", instruction: "Wet the filter paper cone and press it into the funnel.", expectedAction: "insert_filter_paper", actionType: "setup", timeLimit: 60, hints: [{ level: 1, text: "Wet the paper slightly to make it stick to the funnel." }, { level: 2, text: "Press the paper against the funnel walls — no gaps." }, { level: 3, text: "The paper should fit tightly with no air spaces at the sides." }], misconceptionRisks: [] },
-      { stepId: 4, title: "Pour Mixture", instruction: "Slowly pour the sand-water mixture down the glass rod into the funnel.", expectedAction: "pour_mixture", actionType: "add", timeLimit: 90, hints: [{ level: 1, text: "Pour slowly to avoid overflowing the filter paper." }, { level: 2, text: "Use a glass rod to guide the liquid." }, { level: 3, text: "Fill the funnel only 2/3 full at a time." }], misconceptionRisks: [] },
-      { stepId: 5, title: "Collect Filtrate", instruction: "Allow liquid to drip through and collect in the beaker. Observe.", expectedAction: "collect_filtrate", actionType: "observe", timeLimit: 120, hints: [{ level: 1, text: "The clear liquid that drips through is called the filtrate." }, { level: 2, text: "The solid left in the filter paper is called the residue." }, { level: 3, text: "Filtration separates insoluble solids from liquids." }], misconceptionRisks: [] },
+      { stepId: 1, title: "Prepare the Separating Medium", instruction: "Prepare the material that will trap the solid while letting the liquid pass through.", expectedAction: "fold_filter_paper", actionType: "setup", timeLimit: 60, hints: [{ level: 1, text: "Fold the circle in half, then fold in half again." }, { level: 2, text: "Open one layer to form a cone shape." }, { level: 3, text: "The cone should fit snugly inside the funnel." }], misconceptionRisks: [] },
+      { stepId: 2, title: "Set Up the Apparatus", instruction: "Assemble your separation apparatus so the filtered liquid will be collected in a container below.", expectedAction: "setup_funnel", actionType: "setup", timeLimit: 60, hints: [{ level: 1, text: "The funnel tip should point into the beaker." }, { level: 2, text: "Make sure the beaker is directly below the funnel tip." }, { level: 3, text: "The funnel should be stable and not wobble." }], misconceptionRisks: [] },
+      { stepId: 3, title: "Fit the Separating Medium", instruction: "Fit the separating medium into the apparatus so there are no gaps around the edges.", expectedAction: "insert_filter_paper", actionType: "setup", timeLimit: 60, hints: [{ level: 1, text: "Wet the paper slightly to make it stick to the funnel." }, { level: 2, text: "Press the paper against the funnel walls — no gaps." }, { level: 3, text: "The paper should fit tightly with no air spaces at the sides." }], misconceptionRisks: [] },
+      { stepId: 4, title: "Pass the Mixture Through", instruction: "Slowly transfer the mixture into the apparatus, guiding the flow so it doesn't overflow.", expectedAction: "pour_mixture", actionType: "add", timeLimit: 90, hints: [{ level: 1, text: "Pour slowly to avoid overflowing the filter paper." }, { level: 2, text: "Use a glass rod to guide the liquid." }, { level: 3, text: "Fill the funnel only 2/3 full at a time." }], misconceptionRisks: [] },
+      { stepId: 5, title: "Collect and Observe", instruction: "Let the separation finish, then examine what passed through and what was retained.", expectedAction: "collect_filtrate", actionType: "observe", timeLimit: 120, hints: [{ level: 1, text: "The clear liquid that drips through is called the filtrate." }, { level: 2, text: "The solid left in the filter paper is called the residue." }, { level: 3, text: "Filtration separates insoluble solids from liquids." }], misconceptionRisks: [] },
     ],
   },
   {

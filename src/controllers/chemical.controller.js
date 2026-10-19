@@ -1,4 +1,12 @@
 const Chemical = require("../models/Chemical");
+const mediaService = require("../services/mediaService");
+
+// Strip storage internals (`artwork`) and expose only a ready-to-load `imageUrl` (or null), so the
+// mobile app never learns where the binary actually lives.
+const toClientChemical = (c) => {
+  const { artwork, ...rest } = c;
+  return { ...rest, imageUrl: mediaService.resolveImageUrl(c) };
+};
 
 // GET /api/chemicals
 // Query params: search, category, state, page, limit
@@ -26,7 +34,7 @@ const getChemicals = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: chemicals,
+      data: chemicals.map(toClientChemical),
       pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / limit) },
     });
   } catch (error) {
@@ -39,7 +47,7 @@ const getChemicalById = async (req, res, next) => {
   try {
     const chemical = await Chemical.findById(req.params.id).lean();
     if (!chemical) return res.status(404).json({ success: false, message: "Chemical not found." });
-    res.status(200).json({ success: true, data: chemical });
+    res.status(200).json({ success: true, data: toClientChemical(chemical) });
   } catch (error) {
     next(error);
   }

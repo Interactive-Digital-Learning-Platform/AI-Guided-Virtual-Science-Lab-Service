@@ -1,0 +1,41 @@
+title AI-GUIDED VIRTUAL SCIENCE LAB SYSTEM
+
+direction right
+colorMode pastel
+styleMode shadow
+typeface rough
+
+Client [label: "CLIENT", color: blue] {
+  Mobile_App [label: "Mobile Application", icon: smartphone]
+}
+
+Backend [label: "BACKEND SERVICES", color: purple] {
+  Session_Manager [label: "Lab Session & Experiment Management", icon: clipboard-list]
+  Virtual_Lab [label: "Virtual Lab Simulation & Action Processing", icon: flask-conical]
+  Student_Model [label: "AI Student Model & Misconception Detection", icon: brain-circuit]
+  Guidance [label: "Adaptive Hint & Report Generation", icon: lightbulb]
+}
+
+Data [label: "KNOWLEDGE & DATA", color: green] {
+  Knowledge_Base [label: "Experiment & Curriculum Knowledge Base", icon: book-open]
+  Student_Database [label: "Student Action & Session Database", shape: cylinder, icon: database]
+  Model_Parameters [label: "Trained Model Parameters", shape: cylinder, icon: sliders]
+}
+
+Training [label: "MODEL TRAINING", color: orange] {
+  Model_Training [label: "Model Training & Validation", icon: cpu]
+}
+
+Mobile_App > Session_Manager: lab actions
+Session_Manager > Virtual_Lab
+Virtual_Lab > Student_Model
+Student_Model > Guidance
+Guidance > Mobile_App: adaptive hints & session report
+
+Virtual_Lab > Student_Database: store actions & results
+Student_Database > Student_Model: student action history
+Knowledge_Base > Backend: curriculum & signatures
+Model_Parameters --> Student_Model: trained parameters [color: orange]
+
+Student_Database --> Model_Training: training data [color: orange]
+Model_Training --> Model_Parameters: updated model [color: orange]

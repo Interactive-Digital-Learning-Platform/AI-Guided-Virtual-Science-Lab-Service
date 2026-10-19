@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   startSession, submitEquipmentSelection, submitChemicalSelection, submitCompoundBuild,
   logAction, completeSession,
-  getSession, getSessionReport, getUserSessions, getSessionStats, requestHint,
+  getSession, getSessionReport, getSessionNoteContext, getUserSessions, getSessionStats, requestHint, requestHelp,
 } = require("../controllers/session.controller");
 const { protect } = require("../middleware/auth");
 
@@ -14,11 +14,13 @@ router.get("/stats", getSessionStats);
 router.get("/history", getUserSessions);
 router.get("/:id", getSession);
 router.get("/:id/report", getSessionReport);
+router.get("/:id/note-context", getSessionNoteContext);
 router.post("/:id/equipment-selection", submitEquipmentSelection);
 router.post("/:id/chemical-selection", submitChemicalSelection);
 router.post("/:id/compound-builds", submitCompoundBuild);
 router.post("/:id/action", logAction);
 router.post("/:id/complete", completeSession);
 router.post("/:id/hint", requestHint);
+router.post("/:id/help", requestHelp);
 
 module.exports = router;
