@@ -33,6 +33,9 @@ function client() {
     useSSL,
     accessKey: process.env.MINIO_ACCESS_KEY || "minioadmin",
     secretKey: process.env.MINIO_SECRET_KEY || "minioadmin",
+    // Hosted S3-compatible stores: AWS S3 needs the bucket's region ("ap-south-1"), Cloudflare R2
+    // uses "auto". Unset (local MinIO) lets the client discover it, which bucket-scoped keys can't.
+    ...(process.env.MINIO_REGION ? { region: process.env.MINIO_REGION } : {}),
   });
   return _client;
 }
